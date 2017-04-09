@@ -50,7 +50,7 @@ class Extractor(object):
 		return self.getDoc(self.readFromFile(filename))
 	
 	def getDocFromUrl(self,url):
-		return self.getDoc(self.readFromUrl(filename))
+		return self.getDoc(self.readFromUrl(url))
 
 	def getDoc(self,text):
 		doc=self.parseDoc(text)
