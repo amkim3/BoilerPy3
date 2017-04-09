@@ -59,7 +59,7 @@
 
 import re
 from . import document
-from document import DefaultLabels
+from .document import DefaultLabels
 
 # Boilerpipe abstract interface
 
@@ -72,11 +72,11 @@ class BoilerpipeFilter(object):
 		if len(blocksToRemove)==0: return blockArr
 		newBlockArr=[]
 		removeIter=iter(blocksToRemove)
-		curBlockToRemove=removeIter.next()
+		curBlockToRemove=next(removeIter)
 		for idx,block in enumerate(blockArr):
 			if block==curBlockToRemove:
 				try:
-					curBlockToRemove=removeIter.next()
+					curBlockToRemove=next(removeIter)
 				except StopIteration:
 					#add the rest
 					newBlockArr.extend(blockArr[idx+1:])

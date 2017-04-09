@@ -27,10 +27,10 @@
 
 
 from xml.sax import parseString, SAXException
-import HTMLParser
+import html.parser
 from . import filters
 from . import parser
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import re
 
 class Extractor(object):
@@ -67,7 +67,7 @@ class Extractor(object):
 		return text
 	
 	def readFromUrl(self,url):
-		f=urllib2.urlopen(url)
+		f=urllib.request.urlopen(url)
 		text=f.read()
 		encoding=self.getUrlEncoding(f)
 		f.close()
@@ -92,7 +92,7 @@ class Extractor(object):
 			try:
 				bpParser.feed(inputStr)
 			except:
-				print "Error parsing HTML : "+str(e)
+				print("Error parsing HTML : "+str(e))
 				return None
 		doc=bpParser.toTextDocument()
 		return doc

@@ -294,7 +294,7 @@ class TextBlock(object):
 		self.tagLevel = tagLevel
 
 TextBlock.EMPTY_START = TextBlock("", set(), 0, 0, 0, 0, -1)
-TextBlock.EMPTY_END = TextBlock("", set(), 0, 0, 0, 0, sys.maxint)
+TextBlock.EMPTY_END = TextBlock("", set(), 0, 0, 0, 0, sys.maxsize)
 
 
 

@@ -17,4 +17,4 @@
 #  * limitations under the License.
 #  
 
-import extractors,filters,parser,document
+from . import extractors,filters,parser,document

@@ -17,10 +17,10 @@
 #  * limitations under the License.
 #  
 
-from HTMLParser import HTMLParser
+from html.parser import HTMLParser
 from xml.sax import ContentHandler
 from . import document
-from document import DefaultLabels
+from .document import DefaultLabels
 import re
 
 
@@ -375,8 +375,8 @@ class ConditionalLabelAction(LabelAction):
 
 
 class SpecialTokens:
-	ANCHOR_TEXT_START = u'\ue00astart'
-	ANCHOR_TEXT_END = u'\ue00aend'
+	ANCHOR_TEXT_START = '\ue00astart'
+	ANCHOR_TEXT_END = '\ue00aend'
 
 
 #----------------------------------------------------------------------------
@@ -399,7 +399,7 @@ class BoilerpipeBaseParser(object):
 	#all word characters except underscore -- i.e. not (not word or underscore)
 	PAT_VALID_WORD_CHARACTER = re.compile(r"[^\W_]",re.UNICODE)
 #	PAT_WORD = re.compile(r"\ue00a?[\w]+",re.UNICODE)
-	PAT_WORD = re.compile(ur"\ue00a?[\w\"'\.,\!\@\-\:\;\$\?\(\)/]+",re.UNICODE)
+	PAT_WORD = re.compile(r"\ue00a?[\w\"'\.,\!\@\-\:\;\$\?\(\)/]+",re.UNICODE)
 	
 	""" generated source for class BoilerpipeHTMLContentHandler """
 	# 
