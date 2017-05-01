@@ -30,6 +30,7 @@ from xml.sax import parseString, SAXException
 import html.parser
 from . import filters
 from . import parser
+from .marker import HTMLBoilerpipeMarker
 import urllib.request, urllib.error, urllib.parse
 import re
 
@@ -57,6 +58,11 @@ class Extractor(object):
         doc = self.parseDoc(text)
         self.filter.process(doc)
         return doc
+
+    def getMarkedHTML(self, text):
+        doc = self.getDoc(text)
+        m = HTMLBoilerpipeMarker()
+        return m.process(doc, text)
 
     def readFromFile(self, filename):
         f = open(filename, 'r')
