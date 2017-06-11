@@ -706,9 +706,6 @@ class BoilerpipeHTMLParser(HTMLParser, BoilerpipeBaseParser):
 
     def handle_starttag(self, tag, attrs): self.startElement(tag, attrs)
 
-    def handle_startendtag(self, tag, attrs):
-        pass
-
     def handle_endtag(self, tag): self.endElement(tag)
 
     def handle_data(self, data): self.characters(data)
