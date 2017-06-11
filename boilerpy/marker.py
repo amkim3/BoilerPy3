@@ -36,6 +36,11 @@ class HTMLBoilerpipeMarker(object):
     TA_IGNORABLE_ELEMENTS = ['STYLE', 'SCRIPT', 'OPTION', 'NOSCRIPT', 'OBJECT', 'EMBED', 'APPLET', 'LINK', 'HEAD',
                              'SVG', 'SELECT', 'FORM']
 
+    VOID_ELEMENTS = (
+        'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'meta', 'param', 'source',
+        'track', 'wbr'
+    )
+
 
 class Implementation(AnotherBoilerPipeHTMLParser):  # XMLReader
     """ generated source for class Implementation """
@@ -71,7 +76,8 @@ class Implementation(AnotherBoilerPipeHTMLParser):  # XMLReader
     def startElement(self, qName, atts):
         """ generated source for method startElement """
         if qName.upper() in self.hl.TA_IGNORABLE_ELEMENTS:
-            self.inIgnorableElement += 1
+            if qName.lower() not in self.hl.VOID_ELEMENTS:
+                self.inIgnorableElement += 1
 
         if self.inIgnorableElement == 0:
             self.html += '<' + qName
