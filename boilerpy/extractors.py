@@ -1,188 +1,212 @@
-#!/usr/bin/env python
-# 
-#  * boilerpipe
-#  *
-#  * Copyright (c) 2009 Christian Kohlschtter
-#  *
-#  * The author licenses this file to You under the Apache License, Version 2.0
-#  * (the "License"); you may not use this file except in compliance with
-#  * the License.  You may obtain a copy of the License at
-#  *
-#  *     http://www.apache.org/licenses/LICENSE-2.0
-#  *
-#  * Unless required by applicable law or agreed to in writing, software
-#  * distributed under the License is distributed on an "AS IS" BASIS,
-#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  * See the License for the specific language governing permissions and
-#  * limitations under the License.
-#  
-# package: de.l3s.boilerpipe.extractors
+"""
+This file is licensed under the terms of the Apache License, Version 2.0. See the LICENSE file in the root of this
+repository for complete details.
+"""
 
-# 
-#  * The base class of Extractors. Also provides some helper methods to quickly
-#  * retrieve the text that remained after processing.
-#  * 
-#  * @author Christian Kohlschtter
-#
-
-
-from xml.sax import parseString, SAXException
-import html.parser
-from . import filters
-from . import parser
-from .marker import HTMLBoilerpipeMarker
-import urllib.request, urllib.error, urllib.parse
 import re
+import urllib.error
+import urllib.parse
+import urllib.request
+from logging import getLogger
+from typing import Union
+
+from boilerpy3 import filters, parser
+from boilerpy3.document import TextDocument
+from boilerpy3.filters import BoilerpipeFilter
+from boilerpy3.marker import HTMLBoilerpipeMarker
+
+logger = getLogger('boilerpy3')
 
 
-class Extractor(object):
-    def __init__(self, filtr):
+class Extractor:
+    """
+    The base class of Extractors. Also provides some helper methods to quickly retrieve the text that remained after
+    processing.
+    """
+    
+    SCRIPT_REGEX = re.compile(r'<(?:script|SCRIPT)[^>]*>.*?</(?:script|SCRIPT)>', re.DOTALL)
+    
+    def __init__(self, filtr: BoilerpipeFilter) -> None:
         self.filter = filtr
-
-    def getContent(self, text):
-        return self.getDoc(text).getContent()
-
-    def getContentFromUrl(self, url):
-        return self.getDocFromUrl(url).getContent()
-
-    def getContentFromFile(self, filename):
-        return self.getDocFromFile(filename).getContent()
-
-    def getDocFromFile(self, filename):
-        return self.getDoc(self.readFromFile(filename))
-
-    def getDocFromUrl(self, url):
-        return self.getDoc(self.readFromUrl(url))
-
-    def getDoc(self, text):
-        doc = self.parseDoc(text)
+    
+    def get_content(self, text: str) -> str:
+        return self.get_doc(text).content
+    
+    def get_content_from_url(self, url: str) -> str:
+        return self.get_doc_from_url(url).content
+    
+    def get_content_from_file(self, filename) -> str:
+        return self.get_doc_from_file(filename).content
+    
+    def get_doc_from_file(self, filename) -> TextDocument:
+        return self.get_doc(self.read_from_file(filename))
+    
+    def get_doc_from_url(self, url) -> TextDocument:
+        return self.get_doc(self.read_from_url(url))
+    
+    def get_doc(self, text) -> TextDocument:
+        doc = self.parse_doc(text)
         self.filter.process(doc)
         return doc
-
-    def getMarkedHTML(self, text):
-        doc = self.getDoc(text)
+    
+    def get_marked_html(self, text) -> str:
+        doc = self.get_doc(text)
         m = HTMLBoilerpipeMarker()
         return m.process(doc, text)
-
-    def readFromFile(self, filename):
-        f = open(filename, 'r')
-        text = f.read()
-        f.close()
-        try:
-            text = text.decode('utf8')
-        except UnicodeDecodeError:
-            pass
-        return text
-
-    def readFromUrl(self, url):
-        f = urllib.request.urlopen(url)
-        text = f.read()
-        encoding = self.getUrlEncoding(f)
-        f.close()
+    
+    def read_from_file(self, filename: str) -> str:
+        with open(filename) as text_file:
+            return text_file.read()
+    
+    def read_from_url(self, url: str) -> str:
+        with urllib.request.urlopen(url) as url_obj:
+            text = url_obj.read()
+            encoding = self.get_url_encoding(url_obj)
+        
         try:
             text = text.decode(encoding)
         except UnicodeDecodeError:
             pass
         return text
-
-    def getUrlEncoding(self, f):
+    
+    def get_url_encoding(self, f) -> str:
         try:
             return f.headers['content-type'].split('charset=')[1].split(';')[0]
         except:
             return 'utf8'
-
-    def parseDoc(self, inputStr):
-        bpParser = parser.BoilerpipeHTMLParser()
+    
+    def parse_doc(self, input_str: str) -> Union[TextDocument, None]:
+        bp_parser = parser.BoilerpipeHTMLParser()
         try:
-            bpParser.feed(inputStr)
+            bp_parser.feed(input_str)
         except:
             # in case of error, try again, first removing script tag content
-            bpParser = parser.BoilerpipeHTMLParser()
-            inputStr = re.sub(r'<(?:script|SCRIPT)[^>]*>.*?</(?:script|SCRIPT)>', '<script></script>', inputStr, 0,
-                              re.DOTALL)
+            bp_parser = parser.BoilerpipeHTMLParser()
+            input_str = self.SCRIPT_REGEX.sub('<script></script>', input_str)
             try:
-                bpParser.feed(inputStr)
-            except:
-                print("Error parsing HTML : " + str(e))
+                bp_parser.feed(input_str)
+            except Exception:
+                logger.exception('Error parsing HTML')
                 return None
-        doc = bpParser.toTextDocument()
+        doc = bp_parser.to_text_document()
         return doc
 
 
-# class ArticleExtractor
-#  * A full-text extractor which is tuned towards news articles. In this scenario
-#  * it achieves higher accuracy than {@link DefaultExtractor}.
-articleFilterChain = filters.FilterChain([
-    filters.TerminatingBlocksFinder(),
-    filters.DocumentTitleMatchClassifier(None, True),
-    filters.NumWordsRulesClassifier(),
-    filters.IgnoreBlocksAfterContentFilter(),
-    filters.BlockProximityFusion(1, False, False),
-    filters.BoilerplateBlockFilter(),
-    filters.BlockProximityFusion(1, True, False),
-    filters.KeepLargestBlockFilter(),
-    filters.ExpandTitleToContentFilter()
-])
-#      * Works very well for most types of Article-like HTML.
-ARTICLE_EXTRACTOR = Extractor(articleFilterChain)
-
-# class DefaultExtractor
-#      * Usually worse than {@link ArticleExtractor}, but simpler/no heuristics.
-#  * A quite generic full-text extractor. 
-defaultFilterChain = filters.FilterChain([
-    filters.SimpleBlockFusionProcessor(),
-    filters.BlockProximityFusion(1, False, False),
-    filters.DensityRulesClassifier()
-])
-DEFAULT_EXTRACTOR = Extractor(defaultFilterChain)
-
-# class LargestContentExtractor(ExtractorBase):
-#  * A full-text extractor which extracts the largest text component of a page.
-#  * For news articles, it may perform better than the {@link DefaultExtractor},
-#  * but usually worse than {@link ArticleExtractor}.
-largestContentFilterChain = filters.FilterChain([
-    filters.NumWordsRulesClassifier(),
-    filters.BlockProximityFusion(1, False, False),
-    filters.KeepLargestBlockFilter()
-])
-#      * Like {@link DefaultExtractor}, but keeps the largest text block only.
-LARGEST_CONTENT_EXTRACTOR = Extractor(largestContentFilterChain)
-
-# class CanolaExtractor
-#      * Trained on krdwrd Canola (different definition of "boilerplate"). You may
-#      * give it a try.
-CANOLA_EXTRACTOR = Extractor(filters.CanolaFilter())
-
-#  class KeepEverythingExtractor
-#      * Marks everything as content.
-#      * Dummy Extractor; should return the input text. Use this to double-check
-#      * that your problem is within a particular {@link BoilerpipeExtractor}, or
-#      * somewhere else.
-KEEP_EVERYTHING_EXTRACTOR = Extractor(filters.MarkEverythingContentFilter())
-
-# Java class NumWordsRulesExtractor
-#
-#  * A quite generic full-text extractor solely based upon the number of words per
-#  * block (the current, the previous and the next block).
-NUM_WORDS_RULES_EXTRACTOR = Extractor(filters.NumWordsRulesClassifier())
-
-# class ArticleSentencesExtractor
-#  * A full-text extractor which is tuned towards extracting sentences from news articles.
-ARTICLE_SENTENCES_EXTRACTOR = Extractor(filters.FilterChain([
-    articleFilterChain,
-    filters.SplitParagraphBlocksFilter(),
-    filters.MinClauseWordsFilter()
-]))
+class DefaultExtractor(Extractor):
+    """
+    Usually worse than ArticleExtractor, but simpler/no heuristics. A quite generic full-text extractor.
+    """
+    
+    _filter_chain = filters.FilterChain([
+        filters.SimpleBlockFusionProcessor(),
+        filters.BlockProximityFusion(1, False, False),
+        filters.DensityRulesClassifier()
+    ])
+    
+    def __init__(self):
+        super().__init__(self._filter_chain)
 
 
-#  * A full-text extractor which extracts the largest text component of a page.
-#  * For news articles, it may perform better than the {@link DefaultExtractor},
-#  * but usually worse than {@link ArticleExtractor}.
+class ArticleExtractor(Extractor):
+    """
+    A full-text extractor which is tuned towards news articles. In this scenario it achieves higher accuracy than
+    DefaultExtractor. Works very well for most types of Article-like HTML.
+    """
+    
+    _filter_chain = filters.FilterChain([
+        filters.TerminatingBlocksFinder(),
+        filters.DocumentTitleMatchClassifier(None, True),
+        filters.NumWordsRulesClassifier(),
+        filters.IgnoreBlocksAfterContentFilter(),
+        filters.BlockProximityFusion(1, False, False),
+        filters.BoilerplateBlockFilter(),
+        filters.BlockProximityFusion(1, True, False),
+        filters.KeepLargestBlockFilter(),
+        filters.ExpandTitleToContentFilter()
+    ])
+    
+    def __init__(self):
+        super().__init__(self._filter_chain)
+
+
+class LargestContentExtractor(Extractor):
+    """
+    A full-text extractor which extracts the largest text component of a page. For news articles, it may perform better
+    than the DefaultExtractor, but usually worse than ArticleExtractor. Like DefaultExtractor, but keeps the largest
+    text block only.
+    """
+    
+    _filter_chain = filters.FilterChain([
+        filters.NumWordsRulesClassifier(),
+        filters.BlockProximityFusion(1, False, False),
+        filters.KeepLargestBlockFilter()
+    ])
+    
+    def __init__(self):
+        super().__init__(self._filter_chain)
+
+
+class CanolaExtractor(Extractor):
+    """
+    Trained on krdwrd Canola (different definition of "boilerplate"). You may give it a try.
+    """
+    
+    _filter = filters.CanolaFilter()
+    
+    def __init__(self):
+        super().__init__(self._filter)
+
+
+class KeepEverythingExtractor(Extractor):
+    """
+    Marks everything as content. Dummy Extractor; should return the input text. Use this to double-check that your
+    problem is within a particular BoilerpipeExtractor, or somewhere else.
+    """
+    
+    _filter = filters.MarkEverythingContentFilter()
+    
+    def __init__(self):
+        super().__init__(self._filter)
+
+
+class NumWordsRulesExtractor(Extractor):
+    """
+    A quite generic full-text extractor solely based upon the number of words per block (the current, the previous and
+    the next block).
+    """
+    
+    _filter = filters.NumWordsRulesClassifier()
+    
+    def __init__(self):
+        super().__init__(self._filter)
+
+
+class ArticleSentencesExtractor(Extractor):
+    """
+    A full-text extractor which is tuned towards extracting sentences from news articles.
+    """
+    
+    _filter_chain = filters.FilterChain([
+        ArticleExtractor._filter_chain,
+        filters.SplitParagraphBlocksFilter(),
+        filters.MinClauseWordsFilter()
+    ])
+    
+    def __init__(self):
+        super().__init__(self._filter_chain)
+
+
 class KeepEverythingWithMinKWordsFilter(filters.FilterChain):
-    def __init__(self, kMin):
-        filterArr = [
+    """
+    A full-text extractor which extracts the largest text component of a page. For news articles, it may perform better
+    than the DefaultExtractor, but usually worse than ArticleExtractor.
+    """
+    
+    def __init__(self, k_min: int) -> None:
+        # Note: variable was not used initially, seems it should be passed to super() call
+        filter_arr = [
             filters.SimpleBlockFusionProcessor(),
             filters.MarkEverythingContentFilter(),
-            filters.MinWordsFilter(kMin)
+            filters.MinWordsFilter(k_min)
         ]
-        super(KeepEverythingWithMinKWordsFilter, self).__init__(filters)
+        super().__init__(filter_arr)

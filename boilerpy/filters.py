@@ -1,31 +1,16 @@
-#!/usr/bin/env python
-""" generated source for module MarkEverythingContentFilter """
-# 
-#  * boilerpipe
-#  *
-#  * Copyright (c) 2009 Christian Kohlschtter
-#  *
-#  * The author licenses this file to You under the Apache License, Version 2.0
-#  * (the "License"); you may not use this file except in compliance with
-#  * the License.  You may obtain a copy of the License at
-#  *
-#  *	 http://www.apache.org/licenses/LICENSE-2.0
-#  *
-#  * Unless required by applicable law or agreed to in writing, software
-#  * distributed under the License is distributed on an "AS IS" BASIS,
-#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  * See the License for the specific language governing permissions and
-#  * limitations under the License.
-#  
-
+"""
+This file is licensed under the terms of the Apache License, Version 2.0. See the LICENSE file in the root of this
+repository for complete details.
+"""
 
 # -----------------------------------------------------------------------
 #                           FILTER MANIFEST
 # -----------------------------------------------------------------------
+#
 # --------------------- Simple Filters: -----------------------
 # MarkEverythingContentFilter - Marks all blocks as content.
-# InvertedFilter - Reverts the "isContent" flag for all TextBlocks
-# BoilerplateBlockFilter - Removes TextBlocks which have explicitly been marked as "not content". 
+# InvertedFilter - Reverts the "is_content" flag for all TextBlocks
+# BoilerplateBlockFilter - Removes TextBlocks which have explicitly been marked as "not content".
 # MinWordsFilter - Keeps only those content blocks which contain at least k words.
 # MinClauseWordsFilter - Keeps only blocks that have at least one segment fragment ("clause") with at least k words
 # SplitParagraphBlocksFilter - Splits TextBlocks at paragraph boundaries
@@ -38,8 +23,9 @@
 # ContentFusion
 # LabelFusion - Fuses adjacent blocks if their labels are equal.
 # BlockProximityFusion - Fuses adjacent blocks if their distance (in blocks) does not exceed a certain limit.
-# KeepLargestBlockFilter - Keeps the largest {@link TextBlock} only (by the number of words)
-# ExpandTitleToContentFilter - Marks all TextBlocks "content" which are between the headline and the part that has already been marked content, if they are marked MIGHT_BE_CONTENT
+# KeepLargestBlockFilter - Keeps the largest TextBlock only (by the number of words)
+# ExpandTitleToContentFilter - Marks all TextBlocks "content" which are between the headline and the part that has
+#                              already been marked content, if they are marked MIGHT_BE_CONTENT
 # ArticleMetadataFilter
 # AddPrecedingLabelsFilter - Adds the labels of the preceding block to the current block, optionally adding a prefix.
 # DocumentTitleMatchClassifier - Marks TextBlocks which contain parts of the HTML TITLE tag
@@ -47,58 +33,70 @@
 # --------------------- English-trained Heuristic Filters: -----------------------
 # MinFulltextWordsFilter - Keeps only those content blocks which contain at least k full-text words
 # KeepLargestFulltextBlockFilter - Keeps the largest TextBlock only (by the number of words)
-# IgnoreBlocksAfterContentFilter - Marks all blocks as "non-content" that occur after blocks that have been marked INDICATES_END_OF_TEXT
+# IgnoreBlocksAfterContentFilter - Marks all blocks as "non-content" that occur after blocks that have been marked
+#                                  INDICATES_END_OF_TEXT
 # IgnoreBlocksAfterContentFromEndFilter - like above
-# TerminatingBlocksFinder - Finds blocks which are potentially indicating the end of an article text and marks them with INDICATES_END_OF_TEXT
-# NumWordsRulesClassifier - Classifies TextBlocks as content/not-content through rules that have been determined using the C4.8 machine learning algorithm
-# DensityRulesClassifier - lassifies TextBlocks as content/not-content through rules that have been determined using the C4.8 machine learning algorithm
+# TerminatingBlocksFinder - Finds blocks which are potentially indicating the end of an article text and marks them with
+#                           INDICATES_END_OF_TEXT
+# NumWordsRulesClassifier - Classifies TextBlocks as content/not-content through rules that have been determined using
+#                           the C4.8 machine learning algorithm
+# DensityRulesClassifier - Classifies TextBlocks as content/not-content through rules that have been determined using
+#                          the C4.8 machine learning algorithm
 # CanolaFilter - A full-text extractor trained on krdwrd Canola
 
 
-
-
 import re
-from . import document
-from .document import DefaultLabels
+from typing import List, Pattern, Union
+
+from boilerpy3.document import DefaultLabels, TextBlock, TextDocument
 
 
-# Boilerpipe abstract interface
-
-class BoilerpipeFilter(object):
-    def process(self, doc):
+class BoilerpipeFilter:
+    """
+    Boilerpipe abstract interface
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
         pass
-
-    def subtractBlocks(self, blockArr, blocksToRemove):
-        # inefficient but in place: for block in blocksToRemove: blockArr.remove(blocksToRemove)
-        # efficiently subtracts second array from first assuming blocksToRemove shows up in the same order as blocArr
-        if len(blocksToRemove) == 0: return blockArr
-        newBlockArr = []
-        removeIter = iter(blocksToRemove)
-        curBlockToRemove = next(removeIter)
-        for idx, block in enumerate(blockArr):
-            if block == curBlockToRemove:
+    
+    def subtract_blocks(self, block_arr: List[TextBlock], blocks_to_remove: List[TextBlock]) -> List[TextBlock]:
+        """
+        inefficient but in place: for block in blocksToRemove: blockArr.remove(blocksToRemove) efficiently subtracts
+        second array from first assuming blocksToRemove shows up in the same order as blocArr
+        """
+        
+        if len(blocks_to_remove) == 0:
+            return block_arr
+        new_block_arr = []
+        remove_iter = iter(blocks_to_remove)
+        cur_block_to_remove = next(remove_iter)
+        for idx, block in enumerate(block_arr):
+            if block == cur_block_to_remove:
                 try:
-                    curBlockToRemove = next(removeIter)
+                    cur_block_to_remove = next(remove_iter)
                 except StopIteration:
                     # add the rest
-                    newBlockArr.extend(blockArr[idx + 1:])
+                    new_block_arr.extend(block_arr[idx + 1:])
                     break
             else:
-                newBlockArr.append(block)
-        return newBlockArr
+                new_block_arr.append(block)
+        return new_block_arr
 
 
-# chain together multiple filters in sequence
 class FilterChain(BoilerpipeFilter):
-    def __init__(self, filterArr):
+    """
+    Chain together multiple filters in sequence
+    """
+    
+    def __init__(self, filter_arr: List[BoilerpipeFilter]) -> None:
         super(FilterChain, self).__init__()
-        self.filterArr = filterArr
-
-    def process(self, doc):
-        isUpdated = False
+        self.filterArr = filter_arr
+    
+    def process(self, doc: TextDocument) -> bool:
+        is_updated = False
         for filtr in self.filterArr:
-            isUpdated |= filtr.process(doc)
-        return isUpdated
+            is_updated |= filtr.process(doc)
+        return is_updated
 
 
 # -----------------------------------------------------------------------
@@ -106,227 +104,219 @@ class FilterChain(BoilerpipeFilter):
 # -----------------------------------------------------------------------
 
 
-
-# 
-#  * Marks all blocks as content.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class MarkEverythingContentFilter(BoilerpipeFilter):
-    def process(self, doc):
-        """ generated source for method process """
+    """
+    Marks all blocks as content.
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
         changes = False
-        for tb in doc.getTextBlocks():
-            if not tb.isContent():
-                tb.setIsContent(True)
+        for tb in doc.text_blocks:
+            if not tb.is_content:
+                tb.is_content = True
                 changes = True
         return changes
 
 
-# 
-#  * Reverts the "isContent" flag for all {@link TextBlock}s
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class InvertedFilter(BoilerpipeFilter):
-    def process(self, doc):
-        """ generated source for method process """
-        tbs = doc.getTextBlocks()
-        if len(tbs) == 0: return False
-        for tb in tbs: tb.setIsContent(not tb.isContent())
+    """
+    Reverts the "is_content" flag for all TextBlocks
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
+        tbs = doc.text_blocks
+        if len(tbs) == 0:
+            return False
+        for tb in tbs:
+            tb.is_content = not tb.is_content
         return True
 
 
-# 
-#  * Removes {@link TextBlock}s which have explicitly been marked as "not content". 
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class BoilerplateBlockFilter(BoilerpipeFilter):
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        newBlocks = [tb for tb in textBlocks if tb.isContent()]
-        hasChanges = len(newBlocks) < len(textBlocks)
-        doc.setTextBlocks(newBlocks)
+    """
+    Removes TextBlocks which have explicitly been marked as "not content".
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        new_blocks = [tb for tb in text_blocks if tb.is_content]
+        has_changes = len(new_blocks) < len(text_blocks)
+        doc.text_blocks = new_blocks
+        
+        return has_changes
 
-        return hasChanges
 
-
-# 
-#  * Keeps only those content blocks which contain at least <em>k</em> words.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class MinWordsFilter(BoilerpipeFilter):
-    def __init__(self, minWords):
+    """
+    Keeps only those content blocks which contain at least <em>k</em> words.
+    """
+    
+    def __init__(self, min_words: int) -> None:
         super(MinWordsFilter, self).__init__()
-        self.minWords = minWords
-
-    def process(self, doc):
+        self.min_words = min_words
+    
+    def process(self, doc: TextDocument) -> bool:
         changes = False
-        for tb in doc.getTextBlocks():
-            if not tb.isContent(): continue
-            if tb.getNumWords() < self.minWords:
-                tb.setIsContent(False)
-                changes = True
-        return changes
-
-
-# 
-#  * Keeps only blocks that have at least one segment fragment ("clause") with at
-#  * least <em>k</em> words (default: 5).
-#  * 
-#  * NOTE: You might consider using the {@link SplitParagraphBlocksFilter}
-#  * upstream.
-#  * 
-#  * @author Christian Kohlschtter
-#  * @see SplitParagraphBlocksFilter
-#  
-class MinClauseWordsFilter(BoilerpipeFilter):
-    def __init__(self, minWords=5, acceptClausesWithoutDelimiter=False):
-        super(MinClauseWordsFilter, self).__init__()
-        self.minWords = minWords
-        self.acceptClausesWithoutDelimiter = acceptClausesWithoutDelimiter
-
-    PAT_CLAUSE_DELIMITER = re.compile(r"\b[\,\.\:\;\!\?]+(?:\s+|\Z)", re.UNICODE)
-    PAT_WHITESPACE = re.compile("\s+")
-
-    def process(self, doc):
-        """ generated source for method process """
-        changes = False
-        for tb in doc.getTextBlocks():
-            if not tb.isContent(): continue
-            hasClause = False
-            possibleClauseArr = self.PAT_CLAUSE_DELIMITER.split(tb.getText())
-            for possibleClause in possibleClauseArr[:-1]:
-                hasClause = self.isClauseAccepted(possibleClause)
-                if hasClause: break
-
-            # since clauses should *always end* with a delimiter, we normally
-            #  don't consider text without one
-            if self.acceptClausesWithoutDelimiter:
-                hasClause |= self.isClauseAccepted(possibleClauseArr[-1])
-            if not hasClause:
-                tb.setIsContent(False)
-                changes = True
-            #  System.err.println("IS NOT CONTENT: " + text);
-        return changes
-
-    def isClauseAccepted(self, text):
-        """ generated source for method isClause """
-        n = 1
-        for match in self.PAT_WHITESPACE.finditer(text):
-            n += 1
-            if n >= self.minWords: return True
-        return n >= self.minWords
-
-
-# 
-#  * Splits TextBlocks at paragraph boundaries.
-#  * 
-#  * NOTE: This is not fully supported (i.e., it will break highlighting support
-#  * via #getContainedTextElements()), but this one probably is necessary for some other
-#  * filters.
-#  * 
-#  * @author Christian Kohlschtter
-#  * @see MinClauseWordsFilter
-#  
-class SplitParagraphBlocksFilter(BoilerpipeFilter):
-    def process(self, doc):
-        changes = False
-        blocks = doc.getTextBlocks()
-        blocksNew = []
-        for tb in blocks:
-            text = tb.getText();
-            paragraphs = re.split(r"[\n\r]+", text)
-            if len(paragraphs) < 2:
-                blocksNew.append(tb)
+        for tb in doc.text_blocks:
+            if not tb.is_content:
                 continue
-            isContent = tb.isContent()
-            labels = tb.getLabels()
-            for p in paragraphs:
-                tbP = document.TextBlock(p)
-                tbP.setIsContent(isContent)
-                tbP.addLabels(labels)
-                blocksNew.append(tbP)
+            if tb.num_words < self.min_words:
+                tb.is_content = False
                 changes = True
+        return changes
 
-        if changes: doc.setTextBlocks(blocksNew)
+
+class MinClauseWordsFilter(BoilerpipeFilter):
+    """
+    Keeps only blocks that have at least one segment fragment ("clause") with at least <em>k</em> words (default: 5).
+
+    NOTE: You might consider using the SplitParagraphBlocksFilter
+    upstream.
+
+    See SplitParagraphBlocksFilter
+    """
+    
+    PAT_CLAUSE_DELIMITER = re.compile(r"\b[,.:;!?]+(?:\s+|\Z)", re.UNICODE)
+    PAT_WHITESPACE = re.compile(r"\s+")
+    
+    def __init__(self, min_words: int = 5, accept_clauses_without_delimiter: bool = False) -> None:
+        super(MinClauseWordsFilter, self).__init__()
+        self.min_words = min_words
+        self.accept_clauses_without_delimiter = accept_clauses_without_delimiter
+    
+    def process(self, doc: TextDocument) -> bool:
+        changes = False
+        for tb in doc.text_blocks:
+            if not tb.is_content:
+                continue
+            has_clause = False
+            possible_clause_arr = self.PAT_CLAUSE_DELIMITER.split(tb.text)
+            for possible_clause in possible_clause_arr[:-1]:
+                has_clause = self.is_clause_accepted(possible_clause)
+                if has_clause:
+                    break
+            
+            # since clauses should *always end* with a delimiter, we normally don't consider text without one
+            if self.accept_clauses_without_delimiter:
+                has_clause |= self.is_clause_accepted(possible_clause_arr[-1])
+            if not has_clause:
+                tb.is_content = False
+                changes = True
+        return changes
+    
+    def is_clause_accepted(self, text: str):
+        n = 1
+        for _ in self.PAT_WHITESPACE.finditer(text):
+            n += 1
+            if n >= self.min_words:
+                return True
+        return n >= self.min_words
+
+
+class SplitParagraphBlocksFilter(BoilerpipeFilter):
+    """
+    Splits TextBlocks at paragraph boundaries.
+
+    NOTE: This is not fully supported (i.e., it will break highlighting support via #getContainedTextElements()), but
+    this one probably is necessary for some other filters.
+
+    See MinClauseWordsFilter
+    """
+    
+    NEWLINE_REGEX = re.compile(r"[\n\r]+")
+    
+    def process(self, doc: TextDocument) -> bool:
+        changes = False
+        blocks = doc.text_blocks
+        blocks_new = []
+        for tb in blocks:
+            text = tb.text
+            paragraphs = self.NEWLINE_REGEX.split(text)
+            if len(paragraphs) < 2:
+                blocks_new.append(tb)
+                continue
+            is_content = tb.is_content
+            labels = tb.labels
+            for p in paragraphs:
+                tb_p = TextBlock(p)
+                tb_p.is_content = is_content
+                tb_p.add_labels(labels)
+                blocks_new.append(tb_p)
+                changes = True
+        
+        if changes:
+            doc.text_blocks = blocks_new
         return changes
 
 
 class SurroundingToContentFilter(BoilerpipeFilter):
-    # this is now default when no arguments are passed
-    # INSTANCE_TEXT = SurroundingToContentFilter(TextBlockCondition())
-
-    # ctor - condition is an function for an additional condition to determine if it can be made content
-    def __init__(self, condition=lambda tb: tb.getLinkDensity() == 0 and tb.getNumWords() > 6):
+    def __init__(self, condition: callable = lambda tb: tb.linkDensity == 0 and tb.num_words > 6) -> None:
+        """
+        this is now default when no arguments are passed
+        
+        INSTANCE_TEXT = SurroundingToContentFilter(TextBlockCondition())
+        
+        ctor - condition is an function for an additional condition to determine if it can be made content
+        """
+        
         super(SurroundingToContentFilter, self).__init__()
         self.cond = condition
-
-    def process(self, doc):
-        """ generated source for method process """
-        tbs = doc.getTextBlocks()
+    
+    def process(self, doc: TextDocument) -> bool:
+        tbs = doc.text_blocks
         n = len(tbs)
-        hasChanges = False
+        has_changes = False
         i = 1
         while i < n - 1:
-            prev = tbs[i - 1]
-            cur = tbs[i]
-            next = tbs[i + 1]
-            if not cur.isContent() and prev.isContent() and next.isContent() and self.cond(cur):
-                cur.setIsContent(True)
-                hasChanges = True
+            prev_block = tbs[i - 1]
+            cur_block = tbs[i]
+            next_block = tbs[i + 1]
+            if not cur_block.is_content and prev_block.is_content and next_block.is_content and self.cond(cur_block):
+                cur_block.is_content = True
+                has_changes = True
                 i += 2
             else:
+                # WARNING: POSSIBLE BUG - in original i+=2 regardless of whether content is found. this seems illogical
+                # to me - should be +=1
                 i += 1
-        # WARNING: POSSIBLE BUG - in original i+=2 regardless of whether content is found.  this seems illogica to me - should be +=1
+        
+        return has_changes
 
-        return hasChanges
 
-
-#
-#  * Marks all blocks that contain a given label as "boilerplate".
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class LabelToBoilerplateFilter(BoilerpipeFilter):
-    """ generated source for class LabelToBoilerplateFilter """
-
-    # INSTANCE_STRICTLY_NOT_CONTENT = LabelToBoilerplateFilter(DefaultLabels.STRICTLY_NOT_CONTENT)
-
-    def __init__(self, *labels):
+    """
+    Marks all blocks that contain a given label as "boilerplate".
+    
+    INSTANCE_STRICTLY_NOT_CONTENT = LabelToBoilerplateFilter(DefaultLabels.STRICTLY_NOT_CONTENT)
+    """
+    
+    def __init__(self, *labels: str) -> None:
         super(LabelToBoilerplateFilter, self).__init__()
         self.labels = labels
-
-    def process(self, doc):
+    
+    def process(self, doc: TextDocument) -> bool:
         changes = False
-        for tb in doc.getTextBlocks():
-            if tb.isContent() and any(tb.hasLabel(label) for label in self.labels):
-                tb.setIsContent(False)
+        for tb in doc.text_blocks:
+            if tb.is_content and any(tb.has_label(label) for label in self.labels):
+                tb.is_content = False
                 changes = True
         return changes
 
 
-# 
-#  * Marks all blocks that contain a given label as "content".
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class LabelToContentFilter(BoilerpipeFilter):
-    """ generated source for class LabelToContentFilter """
-
-    def __init__(self, *labels):
-        """ generated source for method __init__ """
+    """
+    Marks all blocks that contain a given label as "content".
+    """
+    
+    def __init__(self, *labels: str) -> None:
         super(LabelToContentFilter, self).__init__()
         self.labels = labels
-
-    def process(self, doc):
+    
+    def process(self, doc: TextDocument) -> bool:
         changes = False
-        for tb in doc.getTextBlocks():
-            if not tb.isContent() and any(tb.hasLabel(label) for label in self.labels):
-                tb.setIsContent(True)
+        for tb in doc.text_blocks:
+            if not tb.is_content and any(tb.has_label(label) for label in self.labels):
+                tb.is_content = True
                 changes = True
         return changes
 
@@ -336,404 +326,395 @@ class LabelToContentFilter(BoilerpipeFilter):
 # -----------------------------------------------------------------------
 
 
-
-# 
-#  * Merges two subsequent blocks if their text densities are equal.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class SimpleBlockFusionProcessor(BoilerpipeFilter):
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
+    """
+    Merges two subsequent blocks if their text densities are equal.
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
         changes = False
-        if len(textBlocks) < 2: return False
-        prevBlock = textBlocks[0]
-        blocksToRemove = []
-        for block in textBlocks[1:]:
-            if prevBlock.getTextDensity() == block.getTextDensity():
-                prevBlock.mergeNext(block)
-                blocksToRemove.append(block)
+        if len(text_blocks) < 2:
+            return False
+        prev_block = text_blocks[0]
+        blocks_to_remove = []
+        for block in text_blocks[1:]:
+            if prev_block.text_density == block.text_density:
+                prev_block.merge_next(block)
+                blocks_to_remove.append(block)
                 changes = True
             else:
-                prevBlock = block
-
-        if changes: doc.setTextBlocks(self.subtractBlocks(textBlocks, blocksToRemove))
+                prev_block = block
+        
+        if changes:
+            doc.text_blocks = self.subtract_blocks(text_blocks, blocks_to_remove)
+        
         return changes
 
 
 class ContentFusion(BoilerpipeFilter):
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        if len(textBlocks) < 2: return False
-        # WARNNING: POSSIBLE BUG FOUND : shouldn't prevBlock be reset every passthrough?
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        if len(text_blocks) < 2:
+            return False
+        # WARNING: POSSIBLE BUG FOUND: shouldn't prev_block be reset every passthrough?
         changes = False
-        # changedOnPass - if it has been changed on the previous passthrough
-        changedOnPass = True
-        while changedOnPass:
-            changedOnPass = False
-            prevBlock = textBlocks[0]
-            blocksToRemove = []
-            for block in textBlocks[1:]:
-                if prevBlock.isContent() and block.getLinkDensity() < 0.56 and not block.hasLabel(
-                        DefaultLabels.STRICTLY_NOT_CONTENT):
-                    prevBlock.mergeNext(block)
-                    blocksToRemove.append(block)
-                    changedOnPass = True
+        # if it has been changed on the previous passthrough
+        changed_on_pass = True
+        while changed_on_pass:
+            changed_on_pass = False
+            prev_block = text_blocks[0]
+            blocks_to_remove = []
+            for block in text_blocks[1:]:
+                if prev_block.is_content and block.link_density < 0.56 \
+                        and not block.has_label(DefaultLabels.STRICTLY_NOT_CONTENT):
+                    prev_block.merge_next(block)
+                    blocks_to_remove.append(block)
+                    changed_on_pass = True
                     changes = True
                 else:
-                    prevBlock = block
-                textBlocks = self.subtractBlocks(textBlocks, blocksToRemove)
-        if changes: doc.setTextBlocks(textBlocks)
-
+                    prev_block = block
+                text_blocks = self.subtract_blocks(text_blocks, blocks_to_remove)
+        if changes:
+            doc.text_blocks = text_blocks
+        
         return changes
 
 
-# 
-#  * Fuses adjacent blocks if their labels are equal.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class LabelFusion(BoilerpipeFilter):
-    # INSTANCE = LabelFusion("")
-
-    #
-    #	  * Creates a new {@link LabelFusion} instance.
-    #	  *
-    #	  * @param maxBlocksDistance The maximum distance in blocks.
-    #	  * @param contentOnly
-    #
-    def __init__(self, labelPrefix=""):
-        """ generated source for method __init__ """
+    """
+    Fuses adjacent blocks if their labels are equal.
+    """
+    
+    def __init__(self, label_prefix: str = "") -> None:
+        """
+        Creates a new LabelFusion instance.
+        
+        :param label_prefix: The maximum distance in blocks.
+        """
+        
         super(LabelFusion, self).__init__()
-        self.labelPrefix = labelPrefix
-
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        if len(textBlocks) < 2: return False
+        self.label_prefix = label_prefix
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        if len(text_blocks) < 2:
+            return False
         changes = False
-        prevBlock = textBlocks[0]
-        blocksToRemove = []
-        for block in textBlocks[1::]:
-            if self.equalLabels(prevBlock.getLabels(), block.getLabels()):
-                prevBlock.mergeNext(block)
-                blocksToRemove.append(block)
+        prev_block = text_blocks[0]
+        blocks_to_remove = []
+        for block in text_blocks[1::]:
+            if self.equal_labels(prev_block.labels, block.labels):
+                prev_block.merge_next(block)
+                blocks_to_remove.append(block)
                 changes = True
             else:
-                prevBlock = block
-
-        if changes: doc.setTextBlocks(self.subtractBlocks(textBlocks, blocksToRemove))
-
+                prev_block = block
+        
+        if changes:
+            doc.text_blocks = self.subtract_blocks(text_blocks, blocks_to_remove)
+        
         return changes
-
-    def equalLabels(self, labels1, labels2):
-        """ generated source for method equalLabels """
-        if labels1 == None or labels2 == None: return False
+    
+    def equal_labels(self, labels1: List[str], labels2: List[str]) -> bool:
+        if labels1 is None or labels2 is None:
+            return False
+        
         # NOTE: Should blocks be merged if neither of them have labels???  i.e. labels1==labels2==empty set
-        return self.markupLabelsOnly(labels1) == self.markupLabelsOnly(labels2)
+        return self.markup_labels_only(labels1) == self.markup_labels_only(labels2)
+    
+    def markup_labels_only(self, labels: List[str]) -> set:
+        return {label for label in labels if label.startswith(DefaultLabels.MARKUP_PREFIX)}
 
-    def markupLabelsOnly(self, labels):
-        return set([label for label in labels if label.startswith(DefaultLabels.MARKUP_PREFIX)])
 
-
-#
-#  * Fuses adjacent blocks if their distance (in blocks) does not exceed a certain limit.
-#  * This probably makes sense only in cases where an upstream filter already has removed some blocks.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class BlockProximityFusion(BoilerpipeFilter):
-    """ generated source for class BlockProximityFusion """
-
-    # MAX_DISTANCE_1 = BlockProximityFusion(1, False, False)
-    # MAX_DISTANCE_1_SAME_TAGLEVEL = BlockProximityFusion(1, False, True)
-    # MAX_DISTANCE_1_CONTENT_ONLY = BlockProximityFusion(1, True, False)
-    # MAX_DISTANCE_1_CONTENT_ONLY_SAME_TAGLEVEL = BlockProximityFusion(1, True, True)
-
-    #
-    #	  * Creates a new {@link BlockProximityFusion} instance.
-    #	  *
-    #	  * @param maxBlocksDistance The maximum distance in blocks.
-    #	  * @param contentOnly
-    #
-    def __init__(self, maxBlocksDistance=1, contentOnly=False, sameTagLevelOnly=False):
-        """ generated source for method __init__ """
+    """
+    Fuses adjacent blocks if their distance (in blocks) does not exceed a certain limit. This probably makes sense only
+    in cases where an upstream filter already has removed some blocks.
+    
+    MAX_DISTANCE_1 = BlockProximityFusion(1, False, False)
+    MAX_DISTANCE_1_SAME_TAGLEVEL = BlockProximityFusion(1, False, True)
+    MAX_DISTANCE_1_CONTENT_ONLY = BlockProximityFusion(1, True, False)
+    MAX_DISTANCE_1_CONTENT_ONLY_SAME_TAGLEVEL = BlockProximityFusion(1, True, True)
+    """
+    
+    def __init__(self, max_blocks_distance: int = 1, content_only: bool = False,
+                 same_tag_level_only: bool = False) -> None:
+        """
+        Creates a new BlockProximityFusion instance.
+        
+        :param max_blocks_distance: The maximum distance in blocks.
+        :param content_only:
+        :param same_tag_level_only:
+        """
+        
         super(BlockProximityFusion, self).__init__()
-        self.maxBlocksDistance = maxBlocksDistance
-        self.contentOnly = contentOnly
-        self.sameTagLevelOnly = sameTagLevelOnly
-
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        if len(textBlocks) < 2: return False
+        self.max_blocks_distance = max_blocks_distance
+        self.content_only = content_only
+        self.same_tag_level_only = same_tag_level_only
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        if len(text_blocks) < 2:
+            return False
         changes = False
-
-        if self.contentOnly:
-            startIdx = None
-            for idx, block in enumerate(textBlocks):
-                if block.isContent():
-                    startIdx = idx
+        
+        if self.content_only:
+            start_idx = None
+            for idx, block in enumerate(text_blocks):
+                if block.is_content:
+                    start_idx = idx
                     break
-            if startIdx == None: return False
+            if start_idx is None:
+                return False
         else:
-            startIdx = 0
-
-        prevBlock = textBlocks[startIdx]
-        blocksToRemove = []
-        for block in textBlocks[startIdx + 1:]:
-            if not block.isContent():
-                prevBlock = block
+            start_idx = 0
+        
+        prev_block = text_blocks[start_idx]
+        blocks_to_remove = []
+        for block in text_blocks[start_idx + 1:]:
+            if not block.is_content:
+                prev_block = block
                 continue
-            diffBlocks = block.getOffsetBlocksStart() - prevBlock.getOffsetBlocksEnd() - 1;
-            if diffBlocks <= self.maxBlocksDistance:
+            diff_blocks = block.offset_blocks_start - prev_block.offset_blocks_end - 1
+            if diff_blocks <= self.max_blocks_distance:
                 ok = True
-                if self.contentOnly:
-                    if not prevBlock.isContent() or not block.isContent():
+                if self.content_only:
+                    if not prev_block.is_content or not block.is_content:
                         ok = False
-                if self.sameTagLevelOnly and prevBlock.getTagLevel() != block.getTagLevel():
+                if self.same_tag_level_only and prev_block.tag_level != block.tag_level:
                     ok = False
                 if ok:
-                    prevBlock.mergeNext(block)
+                    prev_block.merge_next(block)
                     # remove current block
-                    blocksToRemove.append(block)
+                    blocks_to_remove.append(block)
                     changes = True
                 else:
-                    prevBlock = block
+                    prev_block = block
             else:
-                prevBlock = block
-
-        if len(blocksToRemove) > 0:
-            newBlocks = self.subtractBlocks(textBlocks, blocksToRemove)
-            doc.setTextBlocks(newBlocks)
+                prev_block = block
+        
+        if len(blocks_to_remove) > 0:
+            doc.text_blocks = self.subtract_blocks(text_blocks, blocks_to_remove)
             changes = True
-
+        
         return changes
 
 
-#
-#  * Keeps the largest {@link TextBlock} only (by the number of words). In case of
-#  * more than one block with the same number of words, the first block is chosen.
-#  * All discarded blocks are marked "not content" and flagged as
-#  * {@link DefaultLabels#MIGHT_BE_CONTENT}.
-#  * 
-#  * Note that, by default, only TextBlocks marked as "content" are taken into consideration.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class KeepLargestBlockFilter(BoilerpipeFilter):
-    """ generated source for class KeepLargestBlockFilter """
+    """
+    Keeps the largest TextBlock only (by the number of words). In case of more than one block with the same
+    number of words, the first block is chosen. All discarded blocks are marked "not content" and flagged as
+    DefaultLabels.
 
-    # INSTANCE = KeepLargestBlockFilter(False)
-    # INSTANCE_EXPAND_TO_SAME_TAGLEVEL = KeepLargestBlockFilter(True)
-
-    def __init__(self, expandToSameLevelText=False):
-        """ generated source for method __init__ """
+    Note that, by default, only TextBlocks marked as "content" are taken into consideration.
+    
+    INSTANCE = KeepLargestBlockFilter(False)
+    INSTANCE_EXPAND_TO_SAME_TAGLEVEL = KeepLargestBlockFilter(True)
+    """
+    
+    def __init__(self, expand_to_same_level_text: bool = False) -> None:
         super(KeepLargestBlockFilter, self).__init__()
-        self.expandToSameLevelText = expandToSameLevelText
-
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        if len(textBlocks) < 2: return False
-
+        self.expand_to_same_level_text = expand_to_same_level_text
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        if len(text_blocks) < 2:
+            return False
+        
         try:
-            contentBlockIter = (tb for tb in textBlocks if tb.isContent())
-            largestBlock = max(contentBlockIter, key=lambda tb: tb.getNumWords())
+            largest_block = max((tb for tb in text_blocks if tb.is_content), key=lambda tb: tb.num_words)
         except ValueError:
             # no content blocks exist / largest block not found
-            largestBlock = None
-
-        for tb in textBlocks:
-            if tb == largestBlock:
-                tb.setIsContent(True)
+            largest_block = None
+        
+        for tb in text_blocks:
+            if tb == largest_block:
+                tb.is_content = True
             else:
-                tb.setIsContent(False)
-                tb.addLabel(DefaultLabels.MIGHT_BE_CONTENT)
-
-        if self.expandToSameLevelText and largestBlock != None:
-            level = largestBlock.getTagLevel()
-            largestBlockIdx = textBlocks.index(largestBlock)
-
-            for tb in textBlocks[largestBlockIdx::-1]:
-                tl = tb.getTagLevel()
+                tb.is_content = False
+                tb.add_label(DefaultLabels.MIGHT_BE_CONTENT)
+        
+        if self.expand_to_same_level_text and largest_block is not None:
+            level = largest_block.tag_level
+            largest_block_idx = text_blocks.index(largest_block)
+            
+            for tb in text_blocks[largest_block_idx::-1]:
+                tl = tb.tag_level
                 if tl < level:
                     break
                 elif tl == level:
-                    tb.setIsContent(True)
-
-            for tb in textBlocks[largestBlockIdx:]:
-                tl = tb.getTagLevel()
+                    tb.is_content = True
+            
+            for tb in text_blocks[largest_block_idx:]:
+                tl = tb.tag_level
                 if tl < level:
                     break
                 elif tl == level:
-                    tb.setIsContent(True)
-
+                    tb.is_content = True
+        
         return True
 
 
-# * Marks all {@link TextBlock}s "content" which are between the headline and the part that
-#  * has already been marked content, if they are marked {@link DefaultLabels#MIGHT_BE_CONTENT}.
-#  * 
-#  * This filter is quite specific to the news domain.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class ExpandTitleToContentFilter(BoilerpipeFilter):
-    def process(self, doc):
-        """ generated source for method process """
+    """
+    Marks all TextBlocks "content" which are between the headline and the part that has already been marked
+    content, if they are marked DefaultLabels#MIGHT_BE_CONTENT.
+    
+    This filter is quite specific to the news domain.
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
         i = 0
-        titleIdx = -1
-        contentStart = -1
-        for tb in doc.getTextBlocks():
-            if contentStart == -1 and tb.hasLabel(DefaultLabels.TITLE):
-                titleIdx = i
-            if contentStart == -1 and tb.isContent():
-                contentStart = i
+        title_idx = -1
+        content_start = -1
+        for tb in doc.text_blocks:
+            if content_start == -1 and tb.has_label(DefaultLabels.TITLE):
+                title_idx = i
+            if content_start == -1 and tb.is_content:
+                content_start = i
             i += 1
-
-        if contentStart <= titleIdx or titleIdx == -1: return False
-
+        
+        if content_start <= title_idx or title_idx == -1:
+            return False
+        
         changes = False
-        for tb in doc.getTextBlocks()[titleIdx:contentStart]:
-            if tb.hasLabel(DefaultLabels.MIGHT_BE_CONTENT):
-                changes |= tb.setIsContent(True)
+        for tb in doc.text_blocks[title_idx:content_start]:
+            if tb.has_label(DefaultLabels.MIGHT_BE_CONTENT):
+                if tb.is_content is not True:
+                    tb.is_content = True
+                    changes = True
+        
         return changes
 
 
 class ArticleMetadataFilter(BoilerpipeFilter):
     # checks for date/time/author blocks
-    PATTERNS_SHORT = [re.compile(
-        r"^[0-9 \,\./]*\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)?\b[0-9 \,\:apm\./]*(?:[CPSDMGET]{2,3})?$"),
-                      re.compile("^[Bb]y ")];
-
-    def process(self, doc):
-        """ generated source for method process """
+    PATTERNS_SHORT = [
+        re.compile(r"^[0-9 ,./]*\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|June|"
+                   r"July|August|September|October|November|December)?\b[0-9 ,:apm./]*(?:[CPSDMGET]{2,3})?$"),
+        re.compile("^[Bb]y ")
+    ]
+    
+    def process(self, doc: TextDocument) -> bool:
         changed = False
-        for tb in doc.getTextBlocks():
-            if tb.getNumWords() > 10: continue
+        for tb in doc.text_blocks:
+            if tb.num_words > 10:
+                continue
             for p in self.PATTERNS_SHORT:
-                text = tb.getText()
+                text = tb.text
                 if p.search(text):
                     changed = True
-                    tb.setIsContent(True)
-                    tb.addLabel(DefaultLabels.ARTICLE_METADATA)
+                    tb.is_content = True
+                    tb.add_label(DefaultLabels.ARTICLE_METADATA)
                     break
         return changed
 
 
-# 
-#  * Adds the labels of the preceding block to the current block, optionally adding a prefix.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class AddPrecedingLabelsFilter(BoilerpipeFilter):
-    # INSTANCE = AddPrecedingLabelsFilter("")
-    # INSTANCE_PRE = AddPrecedingLabelsFilter("^")
-
-    #
-    #	  * Creates a new {@link AddPrecedingLabelsFilter} instance.
-    #	  *
-    #	  * @param maxBlocksDistance The maximum distance in blocks.
-    #	  * @param contentOnly
-    #
-    def __init__(self, labelPrefix=""):
-        """ generated source for method __init__ """
+    """
+    Adds the labels of the preceding block to the current block, optionally adding a prefix.
+    """
+    
+    def __init__(self, label_prefix: str = "") -> None:
+        """
+        Creates a new AddPrecedingLabelsFilter instance.
+        
+        INSTANCE = AddPrecedingLabelsFilter("")
+        INSTANCE_PRE = AddPrecedingLabelsFilter("^")
+        """
+        
         super(AddPrecedingLabelsFilter, self).__init__()
-        self.labelPrefix = labelPrefix
-
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        if len(textBlocks) < 2: return False
+        self.label_prefix = label_prefix
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        if len(text_blocks) < 2:
+            return False
         changes = False
-        blockBelow = None
-
-        for block in textBlocks[::-1]:
-            if blockBelow != None:
-                labels = block.getLabels()
-                if labels != None and len(labels) > 0:
-                    for l in labels: blockBelow.addLabel(self.labelPrefix + l)
+        block_below = None
+        
+        for block in text_blocks[::-1]:
+            if block_below is not None:
+                labels = block.labels
+                if labels is not None and len(labels) > 0:
+                    for l in labels:
+                        block_below.add_label(self.label_prefix + l)
                     changes = True
-            blockBelow = block
-
+            block_below = block
+        
         return changes
 
 
-# 
-#  * Marks {@link TextBlock}s which contain parts of the HTML
-#  * <code>&lt;TITLE&gt;</code> tag, using some heuristics which are quite
-#  * specific to the news domain.
-#  * 
-#  * @author Christian Kohlschtter
-#  
-
 class DocumentTitleMatchClassifier(BoilerpipeFilter):
-    """ generated source for class DocumentTitleMatchClassifier """
-
-    def __init__(self, title, useDocTitle=False):
-        """ generated source for method __init__ """
+    """
+    Marks TextBlocks which contain parts of the HTML <code>&lt;TITLE&gt;</code> tag, using some heuristics which
+    are quite specific to the news domain.
+    """
+    
+    TITLE_REGEXES = [
+        re.compile(r"[ ]*[|:][ ]*"),
+        re.compile(r"[ ]*[|:()][ ]*"),
+        re.compile(r"[ ]*[|:()\-][ ]*"),
+        re.compile(r"[ ]*[|,:()\-][ ]*")
+    ]
+    WORD_REGEX = re.compile(r"\w+", re.UNICODE)
+    
+    def __init__(self, title: Union[str, None], use_doc_title: bool = False) -> None:
         super(DocumentTitleMatchClassifier, self).__init__()
-        self.useDocTitle = useDocTitle
-        if useDocTitle:
-            self.potentialTitles = None
+        self.use_doc_title = use_doc_title
+        if use_doc_title:
+            self.potential_titles = None
         else:
-            self.potentialTitles = self.findPotentialTitles(title)
-
-    def findPotentialTitles(self, title):
-        if title == None: return None
+            self.potential_titles = self.find_potential_titles(title)
+    
+    def find_potential_titles(self, title: str):
+        if title is None:
+            return None
         title = title.strip()
         if len(title) == 0:
             return None
         else:
-            potentialTitles = set()
-            potentialTitles.add(title)
-            p = self.getLongestPart(title, "[ ]*[\||:][ ]*")
-            if p != None: potentialTitles.add(p)
-            p = self.getLongestPart(title, "[ ]*[\||:\(\)][ ]*")
-            if p != None: potentialTitles.add(p)
-            p = self.getLongestPart(title, "[ ]*[\||:\(\)\-][ ]*")
-            if p != None: potentialTitles.add(p)
-            p = self.getLongestPart(title, "[ ]*[\||,|:\(\)\-][ ]*")
-            if p != None: potentialTitles.add(p)
-        return potentialTitles
-
-    def getPotentialTitles(self):
-        """ generated source for method getPotentialTitles """
-        return self.potentialTitles
-
-    def getLongestPart(self, title, pattern):
-        """ generated source for method getLongestPart """
-        parts = re.split(pattern, title)
-        if len(parts) == 1: return None
-
-        longestNumWords = 0
-        longestPart = ""
+            potential_titles = set()
+            potential_titles.add(title)
+            for regex in self.TITLE_REGEXES:
+                p = self.get_longest_part(title, regex)
+                if p is not None:
+                    potential_titles.add(p)
+        return potential_titles
+    
+    def get_longest_part(self, title: str, pattern: Pattern):
+        parts = pattern.split(title)
+        if len(parts) == 1:
+            return None
+        
+        longest_num_words = 0
+        longest_part = ""
         for p in parts:
-            if ".com" in p: continue
-            numWords = self.getNumWords(p)
-            if numWords > longestNumWords or len(p) > len(longestPart):
-                longestNumWords = numWords
-                longestPart = p
-        if len(longestPart) == 0:
+            if ".com" in p:
+                continue
+            num_words = self.get_num_words(p)
+            if num_words > longest_num_words or len(p) > len(longest_part):
+                longest_num_words = num_words
+                longest_part = p
+        if len(longest_part) == 0:
             return None
         else:
-            return longestPart.strip()
-
-    def getNumWords(self, text):
-        return len(re.findall("\w+", text, re.UNICODE))
-
-    def process(self, doc):
-        """ generated source for method process """
-        if self.useDocTitle: self.potentialTitles = self.findPotentialTitles(doc.getTitle())
-        if self.potentialTitles == None: return False
+            return longest_part.strip()
+    
+    def get_num_words(self, text: str):
+        return len(self.WORD_REGEX.findall(text))
+    
+    def process(self, doc: TextDocument) -> bool:
+        if self.use_doc_title:
+            self.potential_titles = self.find_potential_titles(doc.title)
+        if self.potential_titles is None:
+            return False
         changes = False
-        for tb in doc.getTextBlocks():
-            text = tb.getText().strip().lower()
-            if any(candidate.lower() == text for candidate in self.potentialTitles):
-                tb.addLabel(DefaultLabels.TITLE)
+        for tb in doc.text_blocks:
+            text = tb.text.strip().lower()
+            if any(candidate.lower() == text for candidate in self.potential_titles):
+                tb.add_label(DefaultLabels.TITLE)
                 changes = True
         return changes
 
@@ -744,337 +725,317 @@ class DocumentTitleMatchClassifier(BoilerpipeFilter):
 # --- Heuristic Filters that have been trained on English laguage text
 
 
-# 
-#  * Base class for some heuristics that are used by boilerpipe filters.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class HeuristicFilterBase(BoilerpipeFilter):
-    def getNumFullTextWords(self, tb, minTextDensity=9):
-        if tb.getTextDensity() >= minTextDensity:
-            return tb.getNumWords()
+    """
+    Base class for some heuristics that are used by boilerpipe filters.
+    """
+    
+    def get_num_full_text_words(self, tb: TextBlock, min_text_density: int = 9):
+        if tb.text_density >= min_text_density:
+            return tb.num_words
         else:
             return 0
 
 
-#
-#  * Keeps only those content blocks which contain at least k full-text words
-#  * (measured by {@link HeuristicFilterBase#getNumFullTextWords(TextBlock)}). k is 30 by default.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class MinFulltextWordsFilter(HeuristicFilterBase):
-    def __init__(self, minWords=30):
-        self.minWords = minWords
-
-    def process(self, doc):
-        """ generated source for method process """
+    """
+    Keeps only those content blocks which contain at least k full-text words (measured by
+    HeuristicFilterBase#get_num_full_text_words(TextBlock). k is 30 by default.
+    """
+    
+    def __init__(self, min_words: int = 30) -> None:
+        self.min_words = min_words
+    
+    def process(self, doc: TextDocument) -> bool:
         changes = False
-        for tb in doc.getTextBlocks():
-            if tb.isContent() and self.getNumFullTextWords(tb) < self.minWords:
-                tb.setIsContent(False)
+        for tb in doc.text_blocks:
+            if tb.is_content and self.get_num_full_text_words(tb) < self.min_words:
+                tb.is_content = False
                 changes = True
         return changes
 
 
-# 
-#  * Keeps the largest {@link TextBlock} only (by the number of words). In case of
-#  * more than one block with the same number of words, the first block is chosen.
-#  * All discarded blocks are marked "not content" and flagged as
-#  * {@link DefaultLabels#MIGHT_BE_CONTENT}.
-#  * 
-#  * As opposed to {@link KeepLargestBlockFilter}, the number of words are
-#  * computed using {@link HeuristicFilterBase#getNumFullTextWords(TextBlock)}, which only counts
-#  * words that occur in text elements with at least 9 words and are thus believed to be full text.
-#  * 
-#  * NOTE: Without language-specific fine-tuning (i.e., running the default instance), this filter
-#  * may lead to suboptimal results. You better use {@link KeepLargestBlockFilter} instead, which
-#  * works at the level of number-of-words instead of text densities.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class KeepLargestFulltextBlockFilter(HeuristicFilterBase):
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        if len(textBlocks) < 2: return False
-        contentBlocks = [block for block in textBlocks if block.isContent()]
-        if len(contentBlocks) == 0: return False
-        largestBlock = max(contentBlocks, key=self.getNumFullTextWords)
+    """
+    Keeps the largest TextBlock only (by the number of words). In case of more than one block with the same
+    number of words, the first block is chosen. All discarded blocks are marked "not content" and flagged as
+    DefaultLabels. As opposed to KeepLargestBlockFilter, the number of words are computed using HeuristicFilterBase
+    get_num_full_text_words(TextBlock), which only counts words that occur in text elements with at least 9 words and
+    are thus believed to be full text.
 
-        for tb in textBlocks:
-            if tb == largestBlock:
-                tb.setIsContent(True)
+    NOTE: Without language-specific fine-tuning (i.e., running the default instance), this filter may lead to suboptimal
+    results. You better use KeepLargestBlockFilter instead, which works at the level of number-of-words instead
+    of text densities.
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        if len(text_blocks) < 2:
+            return False
+        content_blocks = [block for block in text_blocks if block.is_content]
+        if len(content_blocks) == 0:
+            return False
+        largest_block = max(content_blocks, key=self.get_num_full_text_words)
+        
+        for tb in text_blocks:
+            if tb == largest_block:
+                tb.is_content = True
             else:
-                tb.setIsContent(False)
-                tb.addLabel(DefaultLabels.MIGHT_BE_CONTENT)
+                tb.is_content = False
+                tb.add_label(DefaultLabels.MIGHT_BE_CONTENT)
         return True
 
 
-#
-#  * Marks all blocks as "non-content" that occur after blocks that have been
-#  * marked {@link DefaultLabels#INDICATES_END_OF_TEXT}. These marks are ignored
-#  * unless a minimum number of words in content blocks occur before this mark (default: 60).
-#  * This can be used in conjunction with an upstream {@link TerminatingBlocksFinder}.
-#  * 
-#  * @author Christian Kohlschtter
-#  * @see TerminatingBlocksFinder
-#  
 class IgnoreBlocksAfterContentFilter(HeuristicFilterBase):
-    """ generated source for class IgnoreBlocksAfterContentFilter """
-
-    # DEFAULT_INSTANCE = IgnoreBlocksAfterContentFilter(60)
-    # INSTANCE_200 = IgnoreBlocksAfterContentFilter(200)
-
-    def __init__(self, minNumWords=60):
-        self.minNumWords = minNumWords
-
-    def process(self, doc):
-        """ generated source for method process """
+    """
+    Marks all blocks as "non-content" that occur after blocks that have been marked DefaultLabels#INDICATES_END_OF_TEXT.
+    These marks are ignored unless a minimum number of words in content blocks occur before this mark (default: 60).
+    This can be used in conjunction with an upstream TerminatingBlocksFinder.
+    """
+    
+    def __init__(self, min_num_words: int = 60) -> None:
+        """
+        DEFAULT_INSTANCE = IgnoreBlocksAfterContentFilter(60)
+        INSTANCE_200 = IgnoreBlocksAfterContentFilter(200)
+        """
+        
+        self.min_num_words = min_num_words
+    
+    def process(self, doc: TextDocument) -> bool:
         changes = False
-        numWords = 0
-        foundEndOfText = False
-        for block in doc.getTextBlocks():
-            if block.isContent():
-                numWords += self.getNumFullTextWords(block)
-            if block.hasLabel(DefaultLabels.INDICATES_END_OF_TEXT) and numWords >= self.minNumWords:
-                foundEndOfText = True
-            if foundEndOfText:
+        num_words = 0
+        found_end_of_text = False
+        for block in doc.text_blocks:
+            if block.is_content:
+                num_words += self.get_num_full_text_words(block)
+            if block.has_label(DefaultLabels.INDICATES_END_OF_TEXT) and num_words >= self.min_num_words:
+                found_end_of_text = True
+            if found_end_of_text:
                 changes = True
-                block.setIsContent(False)
-
+                block.is_content = False
+        
         return changes
 
 
-#
-#  * Marks all blocks as "non-content" that occur after blocks that have been
-#  * marked {@link DefaultLabels#INDICATES_END_OF_TEXT}, and after any content block.
-#  * This filter can be used in conjunction with an upstream {@link TerminatingBlocksFinder}.
-#  * 
-#  * @author Christian Kohlschtter
-#  * @see TerminatingBlocksFinder
-#  
 class IgnoreBlocksAfterContentFromEndFilter(HeuristicFilterBase):
-    def process(self, doc):
-        """ generated source for method process """
+    """
+    Marks all blocks as "non-content" that occur after blocks that have been marked DefaultLabels#INDICATES_END_OF_TEXT,
+    and after any content block. This filter can be used in conjunction with an upstream TerminatingBlocksFinder.
+    
+    See TerminatingBlocksFinder
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
         changes = False
         words = 0
-        blocks = doc.getTextBlocks()
-        if len(blocks) == 0: return False
+        blocks = doc.text_blocks
+        if len(blocks) == 0:
+            return False
         for tb in blocks[::-1]:
-            if tb.hasLabel(DefaultLabels.INDICATES_END_OF_TEXT):
-                tb.addLabel(DefaultLabels.STRICTLY_NOT_CONTENT)
-                tb.removeLabel(DefaultLabels.MIGHT_BE_CONTENT)
-                tb.setIsContent(False)
+            if tb.has_label(DefaultLabels.INDICATES_END_OF_TEXT):
+                tb.add_label(DefaultLabels.STRICTLY_NOT_CONTENT)
+                tb.remove_label(DefaultLabels.MIGHT_BE_CONTENT)
+                tb.is_content = False
                 changes = True
-            elif tb.isContent():
-                words += tb.getNumWords()
-                if words > 200: break
+            elif tb.is_content:
+                words += tb.num_words
+                if words > 200:
+                    break
         return changes
 
 
-# 
-#  * Finds blocks which are potentially indicating the end of an article text and
-#  * marks them with {@link DefaultLabels#INDICATES_END_OF_TEXT}. This can be used
-#  * in conjunction with a downstream {@link IgnoreBlocksAfterContentFilter}.
-#  * 
-#  * @author Christian Kohlschtter
-#  * @see IgnoreBlocksAfterContentFilter
-#  
 class TerminatingBlocksFinder(BoilerpipeFilter):
-    #  public static long timeSpent = 0;
-    def process(self, doc):
-        """ generated source for method process """
+    """
+    Finds blocks which are potentially indicating the end of an article text and marks them with
+    DefaultLabels#INDICATES_END_OF_TEXT. This can be used in conjunction with a downstream
+    IgnoreBlocksAfterContentFilter.
+    """
+    
+    DIGIT_REGEX = re.compile(r'\D')
+    
+    def process(self, doc: TextDocument) -> bool:
         changes = False
-
-        for tb in doc.getTextBlocks():
-            if tb.getNumWords() >= 15: continue
-            text = tb.getText().strip()
-            if len(text) < 8: continue
-            textLC = text.lower()
-
+        
+        for tb in doc.text_blocks:
+            if tb.num_words >= 15:
+                continue
+            text = tb.text.strip()
+            if len(text) < 8:
+                continue
+            text_lc = text.lower()
+            
             startmatches = (" reuters", "please rate this", "post a comment")
-            inmatches = (
-            "what you think...", "add your comment", "add comment", "reader views", "have your say", "reader comments",
-            "rtta artikeln")
+            inmatches = ("what you think...", "add your comment", "add comment", "reader views", "have your say",
+                         "reader comments", "rtta artikeln")
             eqmatch = "thanks for your comments - this feedback is now closed"
-
-            if textLC.startswith("comments") or self.startsWithNumber(textLC, " comments",
-                                                                      " users responded in") or any(
-                    textLC.startswith(matchStr) for matchStr in startmatches) or any(
-                            matchStr in textLC for matchStr in inmatches) or textLC == eqmatch:
-                tb.addLabel(DefaultLabels.INDICATES_END_OF_TEXT)
+            
+            if text_lc.startswith("comments") or self.starts_with_number(text_lc, " comments", " users responded in") \
+                    or any(text_lc.startswith(matchStr) for matchStr in startmatches) \
+                    or any(matchStr in text_lc for matchStr in inmatches) or text_lc == eqmatch:
+                tb.add_label(DefaultLabels.INDICATES_END_OF_TEXT)
                 changes = True
-        # timeSpent += System.currentTimeMillis() - t;
+        
         return changes
-
-    #
-    # 	 * Checks whether the given text t starts with a sequence of digits,
-    # 	 * followed by one of the given strings.
-    # 	 *
-    # 	 * @param t
-    # 	 *			The text to examine
-    # 	 * @param len
-    # 	 *			The length of the text to examine
-    # 	 * @param str
-    # 	 *			Any strings that may follow the digits.
-    # 	 * @return true if at least one combination matches
-    #
-    def startsWithNumber(self, text, *matchStrArr):
-        """ generated source for method startsWithNumber """
-        numberMatch = re.search('\D', text)
-        if numberMatch == None:
+    
+    def starts_with_number(self, text: str, *match_str_arr: str):
+        """
+        Checks whether the given text t starts with a sequence of digits, followed by one of the given strings.
+        
+        :param text: The text to examine
+        :param match_str_arr: Any strings that may follow the digits.
+        :return: true if at least one combination matches
+        """
+        
+        number_match = self.DIGIT_REGEX.search(text)
+        if number_match is None:
             pos = len(text)
         else:
-            pos = numberMatch.start()
+            pos = number_match.start()
         if pos == 0:
             return False
         else:
-            return any(text.startswith(matchStr, pos) for matchStr in matchStrArr)
+            return any(text.startswith(matchStr, pos) for matchStr in match_str_arr)
 
 
-# 
-#  * Classifies {@link TextBlock}s as content/not-content through rules that have
-#  * been determined using the C4.8 machine learning algorithm, as described in
-#  * the paper "Boilerplate Detection using Shallow Text Features" (WSDM 2010),
-#  * particularly using number of words per block and link density per block.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class NumWordsRulesClassifier(BoilerpipeFilter):
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        hasChanges = False
-
-        n = len(textBlocks)
-        for i, currentBlock in enumerate(textBlocks):
+    """
+    Classifies TextBlocks as content/not-content through rules that have been determined using the C4.8 machine
+    learning algorithm, as described in the paper "Boilerplate Detection using Shallow Text Features" (WSDM 2010),
+    particularly using number of words per block and link density per block.
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        has_changes = False
+        
+        n = len(text_blocks)
+        for i, currentBlock in enumerate(text_blocks):
             if i > 0:
-                prevBlock = textBlocks[i - 1]
+                prev_block = text_blocks[i - 1]
             else:
-                prevBlock = document.TextBlock.EMPTY_START
+                prev_block = TextBlock.EMPTY_START
             if i + 1 < n:
-                nextBlock = textBlocks[i + 1]
+                next_block = text_blocks[i + 1]
             else:
-                nextBlock = document.TextBlock.EMPTY_START
-            hasChanges |= self.classify(prevBlock, currentBlock, nextBlock)
-        return hasChanges
-
-    def classify(self, prev, curr, next):
-        """ generated source for method classify """
-        isContent = False
-        if curr.getLinkDensity() <= 0.333333:
-            if prev.getLinkDensity() <= 0.555556:
-                if curr.getNumWords() <= 16:
-                    if next.getNumWords() <= 15:
-                        if prev.getNumWords() <= 4:
-                            isContent = False
+                next_block = TextBlock.EMPTY_START
+            has_changes |= self.classify(prev_block, currentBlock, next_block)
+        return has_changes
+    
+    def classify(self, prev_block: TextBlock, curr_block: TextBlock, next_block: TextBlock):
+        if curr_block.link_density <= 0.333333:
+            if prev_block.link_density <= 0.555556:
+                if curr_block.num_words <= 16:
+                    if next_block.num_words <= 15:
+                        if prev_block.num_words <= 4:
+                            is_content = False
                         else:
-                            isContent = True
+                            is_content = True
                     else:
-                        isContent = True
+                        is_content = True
                 else:
-                    isContent = True
+                    is_content = True
             else:
-                if curr.getNumWords() <= 40:
-                    if next.getNumWords() <= 17:
-                        isContent = False
+                if curr_block.num_words <= 40:
+                    if next_block.num_words <= 17:
+                        is_content = False
                     else:
-                        isContent = True
+                        is_content = True
                 else:
-                    isContent = True
+                    is_content = True
         else:
-            isContent = False
-        return curr.setIsContent(isContent)
+            is_content = False
+        
+        changes = curr_block.is_content is is_content
+        curr_block.is_content = is_content
+        
+        return changes
 
 
-#
-#  * Classifies {@link TextBlock}s as content/not-content through rules that have
-#  * been determined using the C4.8 machine learning algorithm, as described in the
-#  * paper "Boilerplate Detection using Shallow Text Features", particularly using
-#  * text densities and link densities.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class DensityRulesClassifier(BoilerpipeFilter):
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        hasChanges = False
-
-        n = len(textBlocks)
-        for i, currentBlock in enumerate(textBlocks):
+    """
+    Classifies TextBlocks as content/not-content through rules that have been determined using the C4.8 machine learning
+    algorithm, as described in the paper "Boilerplate Detection using Shallow Text Features", particularly using text
+    densities and link densities.
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        has_changes = False
+        
+        n = len(text_blocks)
+        for i, current_block in enumerate(text_blocks):
             if i > 0:
-                prevBlock = textBlocks[i - 1]
+                prev_block = text_blocks[i - 1]
             else:
-                prevBlock = document.TextBlock.EMPTY_START
+                prev_block = TextBlock.EMPTY_START
             if i + 1 < n:
-                nextBlock = textBlocks[i + 1]
+                next_block = text_blocks[i + 1]
             else:
-                nextBlock = document.TextBlock.EMPTY_START
-            hasChanges |= self.classify(prevBlock, currentBlock, nextBlock)
-        return hasChanges
-
-    def classify(self, prev, curr, next):
-        """ generated source for method classify """
-        isContent = False
-        if curr.getLinkDensity() <= 0.333333:
-            if prev.getLinkDensity() <= 0.555556:
-                if curr.getTextDensity() <= 9:
-                    if next.getTextDensity() <= 10:
-                        if prev.getTextDensity() <= 4:
-                            isContent = False
+                next_block = TextBlock.EMPTY_START
+            has_changes |= self.classify(prev_block, current_block, next_block)
+        return has_changes
+    
+    def classify(self, prev_block: TextBlock, curr_block: TextBlock, next_block: TextBlock):
+        if curr_block.link_density <= 0.333333:
+            if prev_block.link_density <= 0.555556:
+                if curr_block.text_density <= 9:
+                    if next_block.text_density <= 10:
+                        if prev_block.text_density <= 4:
+                            is_content = False
                         else:
-                            isContent = True
+                            is_content = True
                     else:
-                        isContent = True
+                        is_content = True
                 else:
-                    if next.getTextDensity() == 0:
-                        isContent = False
+                    if next_block.text_density == 0:
+                        is_content = False
                     else:
-                        isContent = True
+                        is_content = True
             else:
-                if next.getTextDensity() <= 11:
-                    isContent = False
+                if next_block.text_density <= 11:
+                    is_content = False
                 else:
-                    isContent = True
+                    is_content = True
         else:
-            isContent = False
-        return curr.setIsContent(isContent)
+            is_content = False
+        
+        changes = curr_block.is_content is is_content
+        curr_block.is_content = is_content
+        
+        return changes
 
 
-#
-#  * A full-text extractor trained on <a href="http://krdwrd.org/">krdwrd</a> <a
-#  * href
-#  * ="https://krdwrd.org/trac/attachment/wiki/Corpora/Canola/CANOLA.pdf">Canola
-#  * </a>. Works well with {@link SimpleEstimator}, too.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 class CanolaFilter(BoilerpipeFilter):
-    def process(self, doc):
-        """ generated source for method process """
-        textBlocks = doc.getTextBlocks()
-        hasChanges = False
-
-        n = len(textBlocks)
-        for i, currentBlock in enumerate(textBlocks):
+    """
+    A full-text extractor trained on http://krdwrd.org/,
+    https://krdwrd.org/trac/attachment/wiki/Corpora/Canola/CANOLA.pdf. Works well with SimpleEstimator, too.
+    """
+    
+    def process(self, doc: TextDocument) -> bool:
+        text_blocks = doc.text_blocks
+        has_changes = False
+        
+        n = len(text_blocks)
+        for i, currentBlock in enumerate(text_blocks):
             if i > 0:
-                prevBlock = textBlocks[i - 1]
+                prev_block = text_blocks[i - 1]
             else:
-                prevBlock = document.TextBlock.EMPTY_START
+                prev_block = TextBlock.EMPTY_START
             if i + 1 < n:
-                nextBlock = textBlocks[i + 1]
+                next_block = text_blocks[i + 1]
             else:
-                nextBlock = document.TextBlock.EMPTY_START
-            hasChanges |= self.classify(prevBlock, currentBlock, nextBlock)
-        return hasChanges
-
-    def classify(self, prev, curr, next):
-        """ generated source for method classify """
-        cond1 = curr.getLinkDensity() > 0 and next.getNumWords() > 11
-        cond2 = curr.getNumWords() > 19
-        cond3 = next.getNumWords() > 6 and next.getLinkDensity() == 0 and prev.getLinkDensity() == 0 and (
-        curr.getNumWords() > 6 or prev.getNumWords() > 7 or next.getNumWords() > 19)
-        isContent = cond1 or cond2 or cond3
-        return curr.setIsContent(isContent)
+                next_block = TextBlock.EMPTY_START
+            has_changes |= self.classify(prev_block, currentBlock, next_block)
+        return has_changes
+    
+    def classify(self, prev_block: TextBlock, curr_block: TextBlock, next_block: TextBlock):
+        cond1 = curr_block.link_density > 0 and next_block.num_words > 11
+        cond2 = curr_block.num_words > 19
+        cond3 = next_block.num_words > 6 and next_block.link_density == 0 and prev_block.link_density == 0 and \
+                (curr_block.num_words > 6 or prev_block.num_words > 7 or next_block.num_words > 19)
+        is_content = cond1 or cond2 or cond3
+        
+        changes = curr_block.is_content is is_content
+        curr_block.is_content = is_content
+        
+        return changes

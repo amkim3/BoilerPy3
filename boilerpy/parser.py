@@ -1,27 +1,18 @@
-#!/usr/bin/env python
-# 
-#  * boilerpipe
-#  *
-#  * Copyright (c) 2009 Christian Kohlschtter
-#  *
-#  * The author licenses this file to You under the Apache License, Version 2.0
-#  * (the "License"); you may not use this file except in compliance with
-#  * the License.  You may obtain a copy of the License at
-#  *
-#  *	 http://www.apache.org/licenses/LICENSE-2.0
-#  *
-#  * Unless required by applicable law or agreed to in writing, software
-#  * distributed under the License is distributed on an "AS IS" BASIS,
-#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  * See the License for the specific language governing permissions and
-#  * limitations under the License.
-#  
+"""
+This file is licensed under the terms of the Apache License, Version 2.0. See the LICENSE file in the root of this
+repository for complete details.
+"""
 
-from html.parser import HTMLParser
-from xml.sax import ContentHandler
-from . import document
-from .document import DefaultLabels
 import re
+from html.parser import HTMLParser
+from logging import getLogger
+from typing import Dict, Set
+from xml.sax import ContentHandler
+from xml.sax.xmlreader import AttributesImpl
+
+from boilerpy3.document import DefaultLabels, TextBlock, TextDocument
+
+logger = getLogger('boilerpy3')
 
 
 # ----------------------------------------------------------------------------
@@ -29,298 +20,277 @@ import re
 # ----------------------------------------------------------------------------
 
 
-class TagAction(object):
-    def start(self, contentHandler, tagName, attrs): return False
+class TagAction:
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        return False
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        return False
+    
+    def changes_tag_level(self) -> bool:
+        return False
 
-    def end(self, contentHandler, tagName): return False
 
-    def changesTagLevel(self): return False
-
-
-#
-#  * Marks this tag as "ignorable", i.e. all its inner content is silently skipped.
-#  
 class IgnorableElementTagAction(TagAction):
-    """ generated source for class TA_IGNORABLE_ELEMENT """
-
-    def start(self, contentHandler, tagName, attrs):
-        contentHandler.inIgnorableElement += 1
+    """
+    Marks this tag as "ignorable", i.e. all its inner content is silently skipped.
+    """
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        content_handler.in_ignorable_element += 1
+        return True
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        content_handler.in_ignorable_element -= 1
+        return True
+    
+    def changes_tag_level(self) -> bool:
         return True
 
-    def end(self, contentHandler, tagName):
-        contentHandler.inIgnorableElement -= 1
-        return True
 
-    def changesTagLevel(self):
-        return True
-
-
-#
-#  * Marks this tag as "anchor" (this should usually only be set for the <code>&lt;A&gt;</code> tag).
-#  * Anchor tags may not be nested.
-#  *
-#  * There is a bug in certain versions of NekoHTML which still allows nested tags.
-#  * If boilerpipe encounters such nestings, a SAXException is thrown.
-#  
 class AnchorTextTagAction(TagAction):
-    """ generated source for class TA_ANCHOR_TEXT """
-
-    def start(self, contentHandler, tagName, attrs):
-        contentHandler.inAnchor += 1
-        if contentHandler.inAnchor > 1:
-            #  as nested A elements are not allowed per specification, we
-            #  are probably reaching this branch due to a bug in the XML
-            #  parser
-            print(
-                "Warning: SAX input contains nested A elements -- You have probably hit a bug in your HTML parser (e.g., NekoHTML bug #2909310). Please clean the HTML externally and feed it to boilerpipe again. Trying to recover somehow...")
-            self.end(contentHandler, tagName)
-        if contentHandler.inIgnorableElement == 0:
-            contentHandler.addToken(SpecialTokens.ANCHOR_TEXT_START)
+    """
+    Marks this tag as "anchor" (this should usually only be set for the <code>&lt;A&gt;</code> tag). Anchor tags may not
+    be nested.
+    
+    There is a bug in certain versions of NekoHTML which still allows nested tags. If boilerpipe encounters such
+    nestings, a SAXException is thrown.
+    """
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        content_handler.in_anchor += 1
+        if content_handler.in_anchor > 1:
+            # as nested A elements are not allowed per specification, we are probably reaching this branch due to a bug
+            # in the XML parser
+            logger.warning("Warning: SAX input contains nested A elements -- You have probably hit a bug in your HTML "
+                           "parser (e.g., NekoHTML bug #2909310). Please clean the HTML externally and feed it to "
+                           "BoilerPy3 again. Trying to recover somehow...")
+            self.end(content_handler, tag_name)
+        if content_handler.in_ignorable_element == 0:
+            content_handler.add_token(SpecialTokens.ANCHOR_TEXT_START)
         return False
-
-    def end(self, contentHandler, tagName):
-        contentHandler.inAnchor -= 1
-        if contentHandler.inAnchor == 0 and contentHandler.inIgnorableElement == 0:
-            contentHandler.addToken(SpecialTokens.ANCHOR_TEXT_END)
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        content_handler.in_anchor -= 1
+        if content_handler.in_anchor == 0 and content_handler.in_ignorable_element == 0:
+            content_handler.add_token(SpecialTokens.ANCHOR_TEXT_END)
         return False
-
-    def changesTagLevel(self):
+    
+    def changes_tag_level(self) -> bool:
         return True
 
 
-#
-#  * Marks this tag the body element (this should usually only be set for the <code>&lt;BODY&gt;</code> tag).
-#  
 class BodyTagAction(TagAction):
-    """ generated source for class TA_BODY """
-
-    def start(self, contentHandler, tagName, attrs):
-        contentHandler.flushBlock()
-        contentHandler.inBody += 1
+    """
+    Marks this tag the body element (this should usually only be set for the <code>&lt;BODY&gt;</code> tag).
+    """
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        content_handler.flush_block()
+        content_handler.in_body += 1
         return False
-
-    def end(self, contentHandler, tagName):
-        contentHandler.flushBlock()
-        contentHandler.inBody -= 1
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        content_handler.flush_block()
+        content_handler.in_body -= 1
         return False
-
-    def changesTagLevel(self):
+    
+    def changes_tag_level(self) -> bool:
         return True
 
 
-#
-#  * Marks this tag a simple "inline" element, which generates whitespace, but no new block.
-#  
 class InlineWhitespaceTagAction(TagAction):
-    """ generated source for class TA_INLINE_WHITESPACE """
-
-    def start(self, contentHandler, tagName, attrs):
-        contentHandler.addWhitespaceIfNecessary()
+    """
+    Marks this tag a simple "inline" element, which generates whitespace, but no new block.
+    """
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        content_handler.add_whitespace_if_necessary()
+        return False
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        content_handler.add_whitespace_if_necessary()
+        return False
+    
+    def changes_tag_level(self) -> bool:
         return False
 
-    def end(self, contentHandler, tagName):
-        contentHandler.addWhitespaceIfNecessary()
-        return False
 
-    def changesTagLevel(self): return False
-
-
-#
-#  * Marks this tag a simple "inline" element, which neither generates whitespace, nor a new block.
-#  
 class InlineTagAction(TagAction):
-    """ generated source for class TA_INLINE_NO_WHITESPACE """
+    """
+    Marks this tag a simple "inline" element, which neither generates whitespace, nor a new block.
+    """
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl):
+        return False
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        return False
+    
+    def changes_tag_level(self) -> bool:
+        return False
 
-    def start(self, contentHandler, tagName, attrs): return False
 
-    def end(self, contentHandler, tagName): return False
-
-    def changesTagLevel(self): return False
-
-
-#
-#  * Explicitly marks this tag a simple "block-level" element, which always generates whitespace
-#  
 class BlockTagAction(TagAction):
-    """ generated source for class TA_BLOCK_LEVEL """
+    """
+    Explicitly marks this tag a simple "block-level" element, which always generates whitespace
+    """
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        return True
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        return True
+    
+    def changes_tag_level(self) -> bool:
+        return True
 
-    def start(self, contentHandler, tagName, attrs): return True
 
-    def end(self, contentHandler, tagName): return True
-
-    def changesTagLevel(self): return True
-
-
-#
-#  * Special TagAction for the <code>&lt;FONT&gt;</code> tag, which keeps track of the
-#  * absolute and relative font size.
-#  
 class FontTagAction(TagAction):
-    """ generated source for class TA_FONT """
+    """
+    Special TagAction for the <code>&lt;FONT&gt;</code> tag, which keeps track of the absolute and relative font size.
+    """
+    
     # WARNING: POSSIBLE BUG -- used to be [0-9] without +
-    PAT_FONT_SIZE = re.compile("([\+\-]?)([0-9]+)")
-
-    def start(self, contentHandler, tagName, attrs):
-        """ generated source for method start """
-        sizeAttr = attrs.getValue("size")
+    PAT_FONT_SIZE = re.compile(r"([+\-]?)([0-9]+)")
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        size_attr = attrs.getValue("size")
         size = None
-        if sizeAttr != None:
-            match = PAT_FONT_SIZE.match(sizeAttr)
-            if match != None:
+        if size_attr is not None:
+            match = self.PAT_FONT_SIZE.match(size_attr)
+            if match is not None:
                 rel = match.group(0)
                 val = match.group(1)
+                # absolute
                 if len(rel) == 0:
-                    #  absolute
                     size = val
+                # relative
                 else:
-                    #  relative
                     # last non-none element from stack, default 3
-                    lastNonNone = (s for s in contentHandler.fontSizeStack[::-1] if s != None)
-                    prevSize = next(lastNonNone, 3)
+                    last_non_none = (s for s in content_handler.font_size_stack[::-1] if s is not None)
+                    prev_size = next(last_non_none, 3)
                     if rel[0] == '+':
-                        size = prevSize + val
+                        size = prev_size + val
                     else:
-                        size = prevSize - val
-        contentHandler.fontSizeStack.append(size)
+                        size = prev_size - val
+        content_handler.font_size_stack.append(size)
+        return False
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        content_handler.font_size_stack.pop()
+        return False
+    
+    def changes_tag_level(self) -> bool:
         return False
 
-    def end(self, contentHandler, tagName):
-        contentHandler.fontSizeStack.pop()
-        return False
 
-    def changesTagLevel(self):
-        return False
-
-
-#
-#  * {@link CommonTagActions} for inline elements, which triggers some {@link LabelAction} on the generated
-#  * {@link TextBlock}.
-#  
 class InlineTagLabelAction(TagAction):
-    """ generated source for class InlineTagLabelAction """
-
-    def __init__(self, action):
-        """ generated source for method __init__ """
+    """
+    CommonTagActions for inline elements, which triggers some LabelAction on the generated TextBlock.
+    """
+    
+    def __init__(self, action) -> None:
         super(InlineTagLabelAction, self).__init__()
         self.action = action
-
-    def start(self, contentHandler, tagName, attrs):
-        """ generated source for method start """
-        contentHandler.addWhitespaceIfNecessary()
-        contentHandler.addLabelAction(self.action)
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        content_handler.add_whitespace_if_necessary()
+        content_handler.add_label_action(self.action)
         return False
-
-    def end(self, contentHandler, tagName):
-        """ generated source for method end """
-        contentHandler.addWhitespaceIfNecessary()
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        content_handler.add_whitespace_if_necessary()
         return False
-
-    def changesTagLevel(self):
-        """ generated source for method changesTagLevel """
+    
+    def changes_tag_level(self) -> bool:
         return False
 
 
-#
-#  * {@link CommonTagActions} for block-level elements, which triggers some {@link LabelAction} on the generated
-#  * {@link TextBlock}.
-#  
 class BlockTagLabelAction(TagAction):
-    """ generated source for class BlockTagLabelAction """
-
-    def __init__(self, action):
-        """ generated source for method __init__ """
+    """
+    CommonTagActions for block-level elements, which triggers some LabelAction} on the generated TextBlock.
+    """
+    
+    def __init__(self, action: 'LabelAction') -> None:
         super(BlockTagLabelAction, self).__init__()
         self.action = action
-
-    def start(self, contentHandler, tagName, attrs):
-        """ generated source for method start """
-        contentHandler.addLabelAction(self.action)
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        content_handler.add_label_action(self.action)
         return True
-
-    def end(self, contentHandler, tagName):
-        """ generated source for method end """
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
         return True
-
-    def changesTagLevel(self):
-        """ generated source for method changesTagLevel """
+    
+    def changes_tag_level(self) -> bool:
         return True
 
 
 class Chained(TagAction):
-    def __init__(self, tagAction1, tagAction2):
-        """ generated source for method __init__ """
+    def __init__(self, tag_action1: TagAction, tag_action2: TagAction) -> None:
         super(Chained, self).__init__()
-        self.tagAction1 = tagAction1
-        self.tagAction2 = tagAction2
-
-    def start(self, contentHandler, tagName, attrs):
-        """ generated source for method start """
-        return self.tagAction1.start(contentHandler, tagName, attrs) | self.tagAction2.start(contentHandler, tagName,
-                                                                                             attrs)
-
-    def end(self, contentHandler, tagName):
-        """ generated source for method end """
-        return self.tagAction1.end(contentHandler, tagName) | self.tagAction2.end(contentHandler, tagName)
-
-    def changesTagLevel(self):
-        """ generated source for method changesTagLevel """
-        return self.tagAction1.changesTagLevel() or self.tagAction2.changesTagLevel()
+        self.tag_action1 = tag_action1
+        self.tag_action2 = tag_action2
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        return self.tag_action1.start(content_handler, tag_name, attrs) | \
+               self.tag_action2.start(content_handler, tag_name, attrs)
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        return self.tag_action1.end(content_handler, tag_name) | self.tag_action2.end(content_handler, tag_name)
+    
+    def changes_tag_level(self) -> bool:
+        return self.tag_action1.changes_tag_level() or self.tag_action2.changes_tag_level()
 
 
 class MarkupTagAction(TagAction):
-    """ generated source for class MarkupTagAction """
-
-    def __init__(self, isBlockLevel):
-        """ generated source for method __init__ """
-        super(MarkupTagAction, self).__init__()
-        self.isBlockLevel = isBlockLevel
-        self.labelStack = []
-
     PAT_NUM = re.compile("[0-9]+")
-
-    def start(self, contentHandler, tagName, attrs):
-        """ generated source for method start """
-        labels = []
-        labels.append(DefaultLabels.MARKUP_PREFIX + tagName)
-        classVal = attrs.getValue("class")
-        if classVal != None and len(classVal) > 0:
-            classVal = self.PAT_NUM.sub("#", classVal).strip()
-            vals = classVal.split(r"[ ]+")
-            labels.append(DefaultLabels.MARKUP_PREFIX + "." + classVal.replace(' ', '.'))
+    
+    def __init__(self, is_block_level: bool) -> None:
+        super(MarkupTagAction, self).__init__()
+        self.is_block_level = is_block_level
+        self.label_stack = []
+    
+    def start(self, content_handler: 'BoilerpipeBaseParser', tag_name: str, attrs: AttributesImpl) -> bool:
+        labels = [DefaultLabels.MARKUP_PREFIX + tag_name]
+        class_val = attrs.getValue("class")
+        if class_val is not None and len(class_val) > 0:
+            class_val = self.PAT_NUM.sub("#", class_val).strip()
+            vals = class_val.split(r"[ ]+")
+            labels.append(f"{DefaultLabels.MARKUP_PREFIX}.{class_val.replace(' ', '.')}")
             if len(vals) > 1:
                 for s in vals:
-                    labels.append(DefaultLabels.MARKUP_PREFIX + "." + s)
-        id = attrs.get("id")
-        if id != None and len(id) < 0:
-            id = self.PAT_NUM.sub("#", id)
-            labels.append(DefaultLabels.MARKUP_PREFIX + "#" + id)
-        ancestors = self.getAncestorLabels()
-        labelsWithAncestors = []
+                    labels.append(f"{DefaultLabels.MARKUP_PREFIX}.{s}")
+        block_id = attrs.get("id")
+        if block_id is not None and len(block_id) < 0:
+            block_id = self.PAT_NUM.sub("#", block_id)
+            labels.append(f"{DefaultLabels.MARKUP_PREFIX}#{block_id}")
+        ancestors = self.get_ancestor_labels()
+        labels_with_ancestors = []
         for l in labels:
             for an in ancestors:
-                labelsWithAncestors.append(an)
-                labelsWithAncestors.append(an + " " + l)
-            labelsWithAncestors.append(l)
-        contentHandler.addLabelAction(LabelAction(labelsWithAncestors))
-        self.labelStack.append(labels)
-        return self.isBlockLevel
-
-    def end(self, contentHandler, tagName):
-        """ generated source for method end """
-        self.labelStack.pop()
-        return self.isBlockLevel
-
-    def changesTagLevel(self):
-        """ generated source for method changesTagLevel """
-        return self.isBlockLevel
-
-    def getAncestorLabels(self):
-        """ generated source for method getAncestorLabels """
-        labelSet = set()
-        for labels in labelStack:
-            if labels == None: continue
-            labelSet.update(labels)
-        return labelSet
+                labels_with_ancestors.append(an)
+                labels_with_ancestors.append(f"{an} {l}")
+            labels_with_ancestors.append(l)
+        content_handler.add_label_action(LabelAction(*labels_with_ancestors))
+        self.label_stack.append(labels)
+        return self.is_block_level
+    
+    def end(self, content_handler: 'BoilerpipeBaseParser', tag_name: str) -> bool:
+        self.label_stack.pop()
+        return self.is_block_level
+    
+    def changes_tag_level(self) -> bool:
+        return self.is_block_level
+    
+    def get_ancestor_labels(self) -> Set[str]:
+        label_set = set()
+        for labels in label_set:
+            if labels is None:
+                continue
+            label_set.update(labels)
+        return label_set
 
 
 class CommonTagActions:
@@ -371,32 +341,32 @@ defaultTagActionMap = {
 #                                LABEL ACTIONS
 # ----------------------------------------------------------------------------
 
-# 
-#  * Helps adding labels to {@link TextBlock}s.
-#  * 
-#  * @author Christian Kohlschtter
-#  
-class LabelAction(object):
-    def __init__(self, *labels):
+class LabelAction:
+    """
+    Helps adding labels to TextBlocks.
+    """
+    
+    def __init__(self, *labels: str) -> None:
         self.labels = labels
-
-    def addTo(self, textBlock):
-        self.addLabelsTo(textBlock)
-
-    def addLabelsTo(self, textBlock):
-        textBlock.addLabels(self.labels)
-
+    
+    def add_to(self, text_block: TextBlock) -> None:
+        self.add_labels_to(text_block)
+    
+    def add_labels_to(self, text_block: TextBlock):
+        text_block.add_labels(self.labels)
+    
     def __str__(self):
         return str(self.labels)
 
 
 class ConditionalLabelAction(LabelAction):
-    def __init__(self, condition, *labels):
+    def __init__(self, condition, *labels: str):
         super(ConditionalLabelAction, self).__init__(*labels)
         self.condition = condition
-
-    def addTo(self, textBlock):
-        if self.condition(textBlock): self.addLabelsTo(textBlock)
+    
+    def add_to(self, text_block: TextBlock):
+        if self.condition(text_block):
+            self.add_labels_to(text_block)
 
 
 class SpecialTokens:
@@ -408,310 +378,290 @@ class SpecialTokens:
 #                           SAX CONTENT HANDLER
 # ----------------------------------------------------------------------------
 
-# 
-#  * A simple SAX {@link ContentHandler}, used by {@link BoilerpipeSAXInput}. Can
-#  * be used by different parser implementations, e.g. NekoHTML and TagSoup.
-#  * 
-#  * @author Christian Kohlschtter
-#  
 
-
-class BoilerpipeBaseParser(object):
+class BoilerpipeBaseParser:
+    """
+    A simple SAX ContentHandler, used by BoilerpipeSAXInput. Can be used by different parser
+    implementations, e.g. NekoHTML and TagSoup.
+    """
+    
     EVENT_START_TAG = 0
     EVENT_END_TAG = 1
     EVENT_CHARACTERS = 2
     EVENT_WHITESPACE = 3
     # all word characters except underscore -- i.e. not (not word or underscore)
     PAT_VALID_WORD_CHARACTER = re.compile(r"[^\W_]", re.UNICODE)
-    #	PAT_WORD = re.compile(r"\ue00a?[\w]+",re.UNICODE)
-    PAT_WORD = re.compile(r"\ue00a?[\w\"'\.,\!\@\-\:\;\$\?\(\)/]+", re.UNICODE)
-
-    """ generated source for class BoilerpipeHTMLContentHandler """
-
-    #
-    # 	 * Constructs a {@link BoilerpipeHTMLContentHandler} using the given
-    # 	 * {@link TagActionMap}.
-    # 	 *
-    # 	 * @param tagActions
-    # 	 *			The {@link TagActionMap} to use, e.g.
-    # 	 *			{@link DefaultTagActionMap}.
-    #
-    def __init__(self, tagActions=None):
-        """ generated source for method __init___0 """
-        # super(BoilerpipeHTMLContentHandler, self).__init__()
-        if tagActions == None:
+    PAT_WORD = re.compile(r"\ue00a?[\w\"'.,!@\-:;$?()/]+", re.UNICODE)
+    
+    def __init__(self, tag_actions: Dict[str, TagAction] = None) -> None:
+        """
+        Constructs a BoilerpipeHTMLContentHandler using the given TagActionMap.
+        
+        :param tag_actions: The TagActionMap to use, e.g. DefaultTagActionMap.
+        """
+        
+        if tag_actions is None:
             self.tagActions = defaultTagActionMap
         else:
-            self.tagActions = tagActions
-
-        self.clearTextBuffer()
-        self.inBody = 0
-        self.inAnchor = 0
-        self.inIgnorableElement = 0
-        self.textElementIdx = 0
-        self.lastStartTag = None
-        self.lastEndTag = None
-        self.lastEvent = None
-        self.offsetBlocks = 0
-        self.currentContainedTextElements = set()
+            self.tagActions = tag_actions
+        
+        self.clear_text_buffer()
+        self.in_body = 0
+        self.in_anchor = 0
+        self.in_ignorable_element = 0
+        self.text_element_idx = 0
+        self.last_start_tag = None
+        self.last_end_tag = None
+        self.last_event = None
+        self.offset_blocks = 0
+        self.current_contained_text_elements = set()
         self.flush = False
-        self.inAnchorText = False
-
+        self.in_anchor_text = False
+        
         self.title = None
-        self.tagLevel = 0
-        self.blockTagLevel = -1
-        self.textBlocks = []
-        self.labelStacks = []
-        self.fontSizeStack = []
-
-    #
-    # 	 * Recycles this instance.
-    #
-    def recycle(self):
-        """ generated source for method recycle """
-        self.clearTextBuffer()
-        self.inBody = 0
-        self.inAnchor = 0
-        self.inIgnorableElement = 0
-        self.textElementIdx = 0
-        self.lastStartTag = None
-        self.lastEndTag = None
-        self.lastEvent = None
-        self.offsetBlocks = 0
-        self.currentContainedTextElements = set()
+        self.tag_level = 0
+        self.block_tag_level = -1
+        self.text_blocks = []
+        self.label_stacks = []
+        self.font_size_stack = []
+        self.text_buffer = ''
+        self.token_buffer = ''
+    
+    def recycle(self) -> None:
+        """
+        Recycles this instance.
+        """
+        
+        self.clear_text_buffer()
+        self.in_body = 0
+        self.in_anchor = 0
+        self.in_ignorable_element = 0
+        self.text_element_idx = 0
+        self.last_start_tag = None
+        self.last_end_tag = None
+        self.last_event = None
+        self.offset_blocks = 0
+        self.current_contained_text_elements = set()
         self.flush = False
-        self.inAnchorText = False
-        self.textBlocks = []
-
+        self.in_anchor_text = False
+        self.text_blocks = []
+        
         # --------- added -------
         self.title = None
-        self.tagLevel = 0
-        self.blockTagLevel = -1
-        self.labelStacks = []
-        self.fontSizeStack = []
-
+        self.tag_level = 0
+        self.block_tag_level = -1
+        self.label_stacks = []
+        self.font_size_stack = []
+    
     # ------------------------------- SAX Parser methods ----------------------------------------
-
-    #  @Override
-    def endDocument(self):
-        """ generated source for method endDocument """
-        self.flushBlock()
-
-    #  @Override
-    def startDocument(self):
+    
+    def end_document(self) -> None:
+        self.flush_block()
+    
+    def start_document(self) -> None:
         pass
-
-    #  @Override
-    def startElement(self, name, attrs):
-        self.labelStacks.append([])
-
-        tagAction = self.tagActions.get(name.strip().upper())
-
-        if tagAction != None:
-            self.flush |= tagAction.start(self, name, attrs)
-            if tagAction.changesTagLevel(): self.tagLevel += 1
+    
+    def start_element(self, name: str, attrs: AttributesImpl) -> None:
+        self.label_stacks.append([])
+        
+        tag_action = self.tagActions.get(name.strip().upper())
+        if tag_action is not None:
+            self.flush |= tag_action.start(self, name, attrs)
+            if tag_action.changes_tag_level():
+                self.tag_level += 1
         else:
-            self.tagLevel += 1
+            self.tag_level += 1
             self.flush = True
-        self.lastEvent = self.EVENT_START_TAG
-        self.lastStartTag = name
-
-    #  @Override
-    def endElement(self, name):
-        tagAction = self.tagActions.get(name.strip().upper())
-
-        if tagAction != None:
-            self.flush |= tagAction.end(self, name)
-            if tagAction.changesTagLevel(): self.tagLevel -= 1
+        self.last_event = self.EVENT_START_TAG
+        self.last_start_tag = name
+    
+    def end_element(self, name: str) -> None:
+        tag_action = self.tagActions.get(name.strip().upper())
+        if tag_action is not None:
+            self.flush |= tag_action.end(self, name)
+            if tag_action.changes_tag_level():
+                self.tag_level -= 1
         else:
             self.flush = True
-            self.tagLevel -= 1
-
-        if self.flush: self.flushBlock()
-        self.lastEvent = self.EVENT_END_TAG
-        self.lastEndTag = name
-        self.labelStacks.pop()
-
-    #  @Override
-    def characters(self, content):
-        self.textElementIdx += 1
+            self.tag_level -= 1
+        
         if self.flush:
-            self.flushBlock()
+            self.flush_block()
+        self.last_event = self.EVENT_END_TAG
+        self.last_end_tag = name
+        self.label_stacks.pop()
+    
+    def characters(self, content: str) -> None:
+        self.text_element_idx += 1
+        if self.flush:
+            self.flush_block()
             self.flush = False
-        if self.inIgnorableElement != 0: return
-
-        if len(content) == 0:    return
-
-        strippedContent = content.strip()
-
-        if len(strippedContent) == 0:
-            self.addWhitespaceIfNecessary()
-            self.lastEvent = self.EVENT_WHITESPACE
+        if self.in_ignorable_element != 0:
             return
-
-        startWhitespace = content[0].isspace()
-        if startWhitespace: self.addWhitespaceIfNecessary()
-
-        if self.blockTagLevel == -1:
-            self.blockTagLevel = self.tagLevel
-        self.textBuffer += strippedContent
-        self.tokenBuffer += strippedContent
-
-        endWhitespace = content[-1].isspace()
-        if endWhitespace: self.addWhitespaceIfNecessary()
-
-        self.lastEvent = self.EVENT_CHARACTERS
-        self.currentContainedTextElements.add(self.textElementIdx)
-
-    #  @Override
-    def ignorableWhitespace(self, whitespace):
-        self.addWhitespaceIfNecessary()
-
+        
+        if len(content) == 0:
+            return
+        
+        stripped_content = content.strip()
+        if len(stripped_content) == 0:
+            self.add_whitespace_if_necessary()
+            self.last_event = self.EVENT_WHITESPACE
+            return
+        
+        start_whitespace = content[0].isspace()
+        if start_whitespace:
+            self.add_whitespace_if_necessary()
+        
+        if self.block_tag_level == -1:
+            self.block_tag_level = self.tag_level
+        self.text_buffer += stripped_content
+        self.token_buffer += stripped_content
+        
+        end_whitespace = content[-1].isspace()
+        if end_whitespace:
+            self.add_whitespace_if_necessary()
+        
+        self.last_event = self.EVENT_CHARACTERS
+        self.current_contained_text_elements.add(self.text_element_idx)
+    
+    def ignorable_whitespace(self) -> None:
+        self.add_whitespace_if_necessary()
+    
     # ------------------------------- utility methods ----------------------------------------
-
-
-    def flushBlock(self):
-        """ generated source for method flushBlock """
-        if self.inBody == 0:
-            if self.lastStartTag.lower() == "title": self.setTitle(self.textBuffer.strip())
-            self.clearTextBuffer()
+    
+    def flush_block(self) -> None:
+        if self.in_body == 0:
+            if self.last_start_tag.lower() == "title":
+                self.set_title(self.text_buffer.strip())
+            self.clear_text_buffer()
             return
-        if len(self.tokenBuffer.strip()) == 0:
-            self.clearTextBuffer()
+        if len(self.token_buffer.strip()) == 0:
+            self.clear_text_buffer()
             return
-
-        tokens = self.tokenize(self.tokenBuffer)
-        numWords = 0
-        numLinkedWords = 0
-        numWrappedLines = 0
-        currentLineLength = -1
+        
+        tokens = self.tokenize(self.token_buffer)
+        num_words = 0
+        num_linked_words = 0
+        num_wrapped_lines = 0
+        current_line_length = -1
         #  don't count the first space
-        maxLineLength = 80
-        numTokens = 0
-        numWordsCurrentLine = 0
-
+        max_line_length = 80
+        num_tokens = 0
+        num_words_current_line = 0
+        
         for token in tokens:
             if token == SpecialTokens.ANCHOR_TEXT_START:
-                self.inAnchorText = True
+                self.in_anchor_text = True
             elif token == SpecialTokens.ANCHOR_TEXT_END:
-                self.inAnchorText = False
-            elif self.isWord(token):
-                numTokens += 1
-                numWords += 1
-                numWordsCurrentLine += 1
-                if self.inAnchorText:
-                    numLinkedWords += 1
-                currentLineLength += len(token) + 1
-                if currentLineLength > maxLineLength:
-                    numWrappedLines += 1
-                    currentLineLength = len(token)
-                    numWordsCurrentLine = 1
+                self.in_anchor_text = False
+            elif self.is_word(token):
+                num_tokens += 1
+                num_words += 1
+                num_words_current_line += 1
+                if self.in_anchor_text:
+                    num_linked_words += 1
+                current_line_length += len(token) + 1
+                if current_line_length > max_line_length:
+                    num_wrapped_lines += 1
+                    current_line_length = len(token)
+                    num_words_current_line = 1
             else:
-                numTokens += 1
-
-        # if only special tokens (numTokens excludes special tokens)
-        if numTokens == 0:
-            self.clearTextBuffer()
+                num_tokens += 1
+        
+        # if only special tokens (num_tokens excludes special tokens)
+        if num_tokens == 0:
+            self.clear_text_buffer()
             return
-
-        if numWrappedLines == 0:
-            numWordsInWrappedLines = numWords
-            numWrappedLines = 1
+        
+        if num_wrapped_lines == 0:
+            num_words_in_wrapped_lines = num_words
+            num_wrapped_lines = 1
         else:
-            numWordsInWrappedLines = numWords - numWordsCurrentLine
-
-        tb = document.TextBlock(self.textBuffer.strip(), self.currentContainedTextElements, numWords, numLinkedWords,
-                                numWordsInWrappedLines, numWrappedLines, self.offsetBlocks)
-        self.currentContainedTextElements = set()
-        self.offsetBlocks += 1
-        self.clearTextBuffer()
-        tb.setTagLevel(self.blockTagLevel)
-        self.addTextBlock(tb)
-        self.blockTagLevel = -1
-
-    def addTextBlock(self, tb):
-        """ generated source for method addTextBlock """
-        for fontSize in self.fontSizeStack[::-1]:
-            if fontSize != None:
-                tb.addLabel("font-" + str(fontSize))
+            num_words_in_wrapped_lines = num_words - num_words_current_line
+        
+        tb = TextBlock(self.text_buffer.strip(), self.current_contained_text_elements, num_words, num_linked_words,
+                       num_words_in_wrapped_lines, num_wrapped_lines, self.offset_blocks)
+        self.current_contained_text_elements = set()
+        self.offset_blocks += 1
+        self.clear_text_buffer()
+        tb.tag_level = self.block_tag_level
+        self.add_text_block(tb)
+        self.block_tag_level = -1
+    
+    def add_text_block(self, tb: TextBlock) -> None:
+        for font_size in self.font_size_stack[::-1]:
+            if font_size is not None:
+                tb.add_label(f"font-{font_size}")
                 break
-        for labelStack in self.labelStacks:
-            for labels in labelStack:
-                labels.addTo(tb)
-        self.textBlocks.append(tb)
-
-    def isWord(self, token):
-        """ generated source for method isWord """
-        return self.PAT_VALID_WORD_CHARACTER.search(token) != None
-
-    def tokenize(self, text):
+        for label_stack in self.label_stacks:
+            for labels in label_stack:
+                labels.add_to(tb)
+        self.text_blocks.append(tb)
+    
+    def is_word(self, token: str) -> bool:
+        return self.PAT_VALID_WORD_CHARACTER.search(token) is not None
+    
+    def tokenize(self, text: str) -> list:
         return self.PAT_WORD.findall(text)
-
-    def getTextBlocks(self):
-        """ generated source for method getTextBlocks """
-        return self.textBlocks
-
-    def getTitle(self):
-        """ generated source for method getTitle """
-        return self.title
-
-    def setTitle(self, s):
-        """ generated source for method setTitle """
-        if s == None or len(s) == 0: return
+    
+    def set_title(self, s: str) -> None:
+        if s is None or len(s) == 0:
+            return
         self.title = s
-
-    #
-    # 	 * Returns a {@link TextDocument} containing the extracted {@link TextBlock}
-    # 	 * s. NOTE: Only call this after parsing.
-    # 	 *
-    # 	 * @return The {@link TextDocument}
-    #
-    def toTextDocument(self):
-        """ generated source for method toTextDocument """
+    
+    def to_text_document(self) -> TextDocument:
+        """
+        Returns a TextDocument containing the extracted TextBlocks. NOTE: Only call this after parsing.
+        
+        :return: The TextDocument
+        """
+        
         #  just to be sure
-        self.flushBlock()
-        return document.TextDocument(self.getTextBlocks(), self.getTitle())
-
-    def addWhitespaceIfNecessary(self):
-        """ generated source for method addWhitespaceIfNecessary """
-        if len(self.textBuffer) == 0 or not self.textBuffer[-1].isspace():
-            self.textBuffer += ' '
-        if len(self.tokenBuffer) == 0 or not self.tokenBuffer[-1].isspace():
-            self.tokenBuffer += ' '
-
-    def clearTextBuffer(self):
-        self.textBuffer = ''
-        self.tokenBuffer = ''
-
-    def addToken(self, token):
-        self.addWhitespaceIfNecessary()
-        self.tokenBuffer += token
-        self.addWhitespaceIfNecessary()
-
-    def addLabelAction(self, la):
-        """ generated source for method addLabelAction """
-        if len(self.labelStacks) == 0: self.labelStacks.append([])
-        self.labelStacks[-1].append(la)
+        self.flush_block()
+        return TextDocument(self.text_blocks, self.title)
+    
+    def add_whitespace_if_necessary(self) -> None:
+        if len(self.text_buffer) == 0 or not self.text_buffer[-1].isspace():
+            self.text_buffer += ' '
+        if len(self.token_buffer) == 0 or not self.token_buffer[-1].isspace():
+            self.token_buffer += ' '
+    
+    def clear_text_buffer(self) -> None:
+        self.text_buffer = ''
+        self.token_buffer = ''
+    
+    def add_token(self, token: str) -> None:
+        self.add_whitespace_if_necessary()
+        self.token_buffer += token
+        self.add_whitespace_if_necessary()
+    
+    def add_label_action(self, la: LabelAction) -> None:
+        if len(self.label_stacks) == 0:
+            self.label_stacks.append([])
+        self.label_stacks[-1].append(la)
 
 
 class BoilerpipeHTMLParser(HTMLParser, BoilerpipeBaseParser):
-    def __init__(self):
+    def __init__(self) -> None:
         HTMLParser.__init__(self)
         BoilerpipeBaseParser.__init__(self)
-
-    def feed(self, data):
-        self.startDocument()
+    
+    def feed(self, data: str) -> None:
+        self.start_document()
         HTMLParser.feed(self, data)
-        self.endDocument()
-
-    def handle_starttag(self, tag, attrs): self.startElement(tag, attrs)
-
-    def handle_endtag(self, tag): self.endElement(tag)
-
-    def handle_data(self, data): self.characters(data)
+        self.end_document()
+    
+    def handle_starttag(self, tag: str, attrs: AttributesImpl) -> None:
+        self.start_element(tag, attrs)
+    
+    def handle_endtag(self, tag: str) -> None:
+        self.end_element(tag)
+    
+    def handle_data(self, data: str) -> None:
+        self.characters(data)
 
 
 class BoilerpipeSAXContentHandler(ContentHandler, BoilerpipeBaseParser):
-    def __init__(self):
+    def __init__(self) -> None:
         ContentHandler.__init__(self)
         BoilerpipeBaseParser.__init__(self)
