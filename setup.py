@@ -1,27 +1,35 @@
-import os
-from distutils.core import setup
+from setuptools import setup
 
-# Utility function to read the README file.
-# Used for the long_description.  It's nice, because now 1) we have a top level
-# README file and 2) it's easier to type in the README file than to put a raw
-# string in below ...
-def read(fname):
-	return open(os.path.join(os.path.dirname(__file__), fname)).read()
+with open('README.md') as readme_file:
+    long_description = readme_file.read()
 
 setup(
-	name = "boilerpy",
-	version = "1.0",
-	author = "Sam Myer",
-	author_email = "mail@frozencavemanmedia.com",
-	description = "Python port of Boilerpipe, Boilerplate Removal and Fulltext Extraction from HTML pages",
-	license = "Apache 2.0",
-	keywords = "boilerpipe fulltext extraction",
-	url = "https://github.com/sammyer/BoilerPy",
-	packages=['boilerpy'],
-	long_description=read('README.txt'),
-	classifiers=[
-		"Development Status :: 4 - Beta",
-		"Topic :: Utilities",
-		"License :: OSI Approved :: Apache License",
-	]
+        name='boilerpy3',
+        version='1.0.1',
+        python_requires='>=3.6.*',
+        author='John Riebold',
+        author_email='jmriebold@gmail.com',
+        license='Apache 2.0',
+        description='Python port of Boilerpipe, Boilerplate Removal and Fulltext Extraction from HTML pages',
+        long_description=long_description,
+        long_description_content_type="text/markdown",
+        keywords=[
+            'boilerpipe',
+            'boilerpy',
+            'html text extraction',
+            'text extraction',
+            'full text extraction'
+        ],
+        classifiers=[
+            'Development Status :: 4 - Beta',
+            'Topic :: Utilities',
+            'License :: OSI Approved :: Apache Software License',
+            'Programming Language :: Python :: 3',
+            'Programming Language :: Python :: 3.6',
+            'Programming Language :: Python :: 3.7'
+        ],
+        url='https://github.com/jmriebold/BoilerPy3',
+        packages=[
+            'boilerpy3'
+        ],
 )

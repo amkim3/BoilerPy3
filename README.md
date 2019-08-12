@@ -1,92 +1,94 @@
-# BoilerPy
-
-##About
-
-BoilerPy is a native Python port of Christian Kohlschütter's Boilerpipe library, released under the Apache 2.0 Licence. (http://code.google.com/p/boilerpipe/
-)
-
-I created this port since I don't have access to Java on my webhost and I wanted to create a pure Python version.  Another Python version which consists of Python hooks to the original Java library can be found here : (https://github.com/misja/python-boilerpipe
-)  It might be a better option if you are able to run Java.
-
-BoilerPy was created with the help of the excellent Java2Python library :(https://github.com/natural/java2python
-)
+# BoilerPy3
 
 
-##Installation
+## About
 
-Download the package from dist/BoilerPy1.0.zip
+BoilerPy3 is a native Python [port](https://github.com/natural/java2python) of Christian Kohlschütter's [Boilerpipe](https://github.com/kohlschutter/boilerpipe) library, released under the Apache 2.0 Licence.
 
-BoilerPy was packaged with distutils.  In can be installed as following:
+This package is based on [sammyer's](https://github.com/sammyer) [BoilerPy](https://github.com/sammyer/BoilerPy), specifically [mercuree's](https://github.com/mercuree) [Python3-compatible fork](https://github.com/mercuree/BoilerPy). This fork updates the codebase to be more Pythonic (proper attribute access, docstrings, type-hinting, snake case, etc.) and make use Python 3.6 features (f-strings), in addition to switching testing frameworks from Unittest to PyTest.
 
-```
->python setup.py install
+**Note**: This package is based on Boilerpipe 1.2 (at or before [this commit](https://github.com/kohlschutter/boilerpipe/tree/b0816590340f4317f500c64565b23beb4fb9a827)), as that's when the code was originally ported to Python. I experimented with updating the code to match Boilerpipe 1.3, however because it performed worse in my tests, I ultimately decided to leave it at 1.2-equivalent.
+
+
+## Installation
+
+To install the latest version from PyPI, execute:
+
+```shell
+pip install boilerpy3
 ```
 
-##Usage
+If you'd like to try out any unreleased features you can install directly from GitHub like so:
 
-The top-level interfaces are extractors.  Use getContent() to extract the filtered text.
+```shell
+pip install git+https://github.com/jmriebold/BoilerPy
+```
+
+
+## Usage
+
+The top-level interfaces are the Extractors. Use the `get_content()` methods to extract the filtered text.
 
 ```python
-import boilerpy
+from boilerpy3 import extractors
 
-extractor=boilerpy.extractors.ARTICLE_EXTRACTOR
-extractor.getContentFromUrl('http://www.example.com/')
+extractor = extractors.ArticleExtractor()
 
-extractor.getContentFromFile('site/example.html')
+# From a URL
+content = extractor.get_content_from_url('http://www.example.com/')
 
-extractor.getContent('<html><body><h1>Example</h1></body></html>')
+# From a file
+content = extractor.get_content_from_file('tests/test.html')
 
+# From raw HTML
+content = extractor.get_content('<html><body><h1>Example</h1></body></html>')
 ```
 
-Alternatively, se getDoc() to return a boilerpipe document from which you can get more detailed information
+Alternatively, use `get_doc()` to return a Boilerpipe document from which you can get more detailed information.
 
 ```python
-import boilerpy
+from boilerpy3 import extractors
 
-extractor=boilerpy.extractors.ARTICLE_EXTRACTOR
+extractor = extractors.ArticleExtractor()
 
-doc=extractor.getDocFromUrl('http://www.example.com/')
-content=doc.getContent()
-title=doc.getTitle()
-
+doc = extractor.get_doc_from_url('http://www.example.com/')
+content = doc.content
+title = doc.title
 ```
 
-##Extractors
 
-###ARTICLE_EXTRACTOR
+## Extractors
+
+
+### DefaultExtractor
+
+Usually worse than ArticleExtractor, but simpler/no heuristics. A quite generic full-text extractor. 
+
+
+### ArticleExtractor
 
 A full-text extractor which is tuned towards news articles. In this scenario it achieves higher accuracy than DefaultExtractor. Works very well for most types of Article-like HTML.
 
-
-###DEFAULT_EXTRACTOR
-
-Usually worse than ArticleExtractor, but simpler/no heuristics.  A quite generic full-text extractor. 
-
-
-###LARGEST_CONTENT_EXTRACTOR
-
-A full-text extractor which extracts the largest text component of a page.  For news articles, it may perform better than the DefaultExtractor but usually worse than ArticleExtractor
-
-
-###CANOLA_EXTRACTOR
-
-Trained on krdwrd Canola (different definition of "boilerplate"). You may give it a try.
-
-
-###KEEP_EVERYTHING_EXTRACTOR
-
-Marks everything as content. Dummy Extractor; should return the input text. Use this to double-check that your problem is within a particular Extractor or somewhere else.
-
-
-###NUM_WORDS_RULES_EXTRACTOR
-
-A quite generic full-text extractor solely based upon the number of words per block (the current, the previous and the next block).
-
-
-###ARTICLE_SENTENCES_EXTRACTOR
+### ArticleSentencesExtractor
 
 A full-text extractor which is tuned towards extracting sentences from news articles.
 
-## Version
 
-1.0 - Created 15 Feb 2013
+### LargestContentExtractor
+
+A full-text extractor which extracts the largest text component of a page. For news articles, it may perform better than the DefaultExtractor but usually worse than ArticleExtractor
+
+
+### CanolaExtractor
+
+A full-text extractor trained on [krdwrd](http://krdwrd.org) [Canola](https://krdwrd.org/trac/attachment/wiki/Corpora/Canola/CANOLA.pdf). Works well with SimpleEstimator, too.
+
+
+### KeepEverythingExtractor
+
+Dummy extractor which marks everything as content. Should return the input text. Use this to double-check that your problem is within a particular Extractor or somewhere else.
+
+
+### NumWordsRulesExtractor
+
+A quite generic full-text extractor solely based upon the number of words per block (the current, the previous and the next block).
