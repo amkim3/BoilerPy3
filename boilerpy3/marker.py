@@ -53,7 +53,7 @@ class Implementation(AnotherBoilerPipeHTMLParser):
     def process(self, doc: TextDocument, is_: str):
         for block in doc.text_blocks:
             if block.is_content:
-                bs = block.containedTextElements
+                bs = block.contained_text_elements
                 if bs:
                     self.content_bit_set = self.content_bit_set.union(bs)
         
