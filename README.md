@@ -1,5 +1,7 @@
 # BoilerPy3
 
+![build](https://github.com/jmriebold/BoilerPy3/workflows/Build/badge.svg)
+
 
 ## About
 
