@@ -5,7 +5,7 @@ with open('README.md') as readme_file:
 
 setup(
         name='boilerpy3',
-        version='1.0.2',
+        version='1.0.3',
         python_requires='>=3.6.*',
         author='John Riebold',
         author_email='jmriebold@gmail.com',
@@ -26,7 +26,9 @@ setup(
             'License :: OSI Approved :: Apache Software License',
             'Programming Language :: Python :: 3',
             'Programming Language :: Python :: 3.6',
-            'Programming Language :: Python :: 3.7'
+            'Programming Language :: Python :: 3.7',
+            'Programming Language :: Python :: 3.8',
+            'Programming Language :: Python :: 3.9'
         ],
         url='https://github.com/jmriebold/BoilerPy3',
         packages=[
