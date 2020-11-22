@@ -23,7 +23,7 @@ pip install boilerpy3
 If you'd like to try out any unreleased features you can install directly from GitHub like so:
 
 ```shell
-pip install git+https://github.com/jmriebold/BoilerPy
+pip install git+https://github.com/jmriebold/BoilerPy3
 ```
 
 
@@ -64,7 +64,7 @@ title = doc.title
 
 ### DefaultExtractor
 
-Usually worse than ArticleExtractor, but simpler/no heuristics. A quite generic full-text extractor. 
+Usually worse than ArticleExtractor, but simpler/no heuristics. A quite generic full-text extractor.
 
 
 ### ArticleExtractor
