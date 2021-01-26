@@ -90,11 +90,11 @@ class FilterChain(BoilerpipeFilter):
     
     def __init__(self, filter_arr: List[BoilerpipeFilter]) -> None:
         super(FilterChain, self).__init__()
-        self.filterArr = filter_arr
+        self.filter_arr = filter_arr
     
     def process(self, doc: TextDocument) -> bool:
         is_updated = False
-        for filtr in self.filterArr:
+        for filtr in self.filter_arr:
             is_updated |= filtr.process(doc)
         return is_updated
 
@@ -870,8 +870,8 @@ class TerminatingBlocksFinder(BoilerpipeFilter):
             eqmatch = "thanks for your comments - this feedback is now closed"
             
             if text_lc.startswith("comments") or self.starts_with_number(text_lc, " comments", " users responded in") \
-                    or any(text_lc.startswith(matchStr) for matchStr in startmatches) \
-                    or any(matchStr in text_lc for matchStr in inmatches) or text_lc == eqmatch:
+                    or any(text_lc.startswith(match_str) for match_str in startmatches) \
+                    or any(match_str in text_lc for match_str in inmatches) or text_lc == eqmatch:
                 tb.add_label(DefaultLabels.INDICATES_END_OF_TEXT)
                 changes = True
         
@@ -894,7 +894,7 @@ class TerminatingBlocksFinder(BoilerpipeFilter):
         if pos == 0:
             return False
         else:
-            return any(text.startswith(matchStr, pos) for matchStr in match_str_arr)
+            return any(text.startswith(match_str, pos) for match_str in match_str_arr)
 
 
 class NumWordsRulesClassifier(BoilerpipeFilter):
@@ -1016,7 +1016,7 @@ class CanolaFilter(BoilerpipeFilter):
         has_changes = False
         
         n = len(text_blocks)
-        for i, currentBlock in enumerate(text_blocks):
+        for i, current_block in enumerate(text_blocks):
             if i > 0:
                 prev_block = text_blocks[i - 1]
             else:
@@ -1025,7 +1025,7 @@ class CanolaFilter(BoilerpipeFilter):
                 next_block = text_blocks[i + 1]
             else:
                 next_block = TextBlock.EMPTY_START
-            has_changes |= self.classify(prev_block, currentBlock, next_block)
+            has_changes |= self.classify(prev_block, current_block, next_block)
         return has_changes
     
     def classify(self, prev_block: TextBlock, curr_block: TextBlock, next_block: TextBlock):

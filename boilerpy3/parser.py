@@ -7,7 +7,7 @@ import re
 from html.parser import HTMLParser
 from logging import getLogger
 from typing import Dict, Set
-from xml.sax import ContentHandler
+from xml.sax.handler import ContentHandler
 from xml.sax.xmlreader import AttributesImpl
 
 from boilerpy3.document import DefaultLabels, TextBlock, TextDocument

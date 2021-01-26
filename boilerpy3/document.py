@@ -195,11 +195,7 @@ class TextDocument:
         :return: Debug information.
         """
         
-        sb = []
-        for tb in self.text_blocks:
-            sb.append(f'{tb}\n')
-        
-        return ''.join(sb)
+        return ''.join([f'{tb}\n' for tb in self.text_blocks])
 
 
 class TextDocumentStatistics:

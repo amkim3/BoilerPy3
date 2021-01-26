@@ -22,13 +22,13 @@ class AnotherBoilerPipeHTMLParser(BoilerpipeHTMLParser):
 
 
 class HTMLBoilerpipeMarker:
-    ALLOWED_ATTRIBUTES = ['class', 'href', 'src']
-    TA_IGNORABLE_ELEMENTS = ['STYLE', 'SCRIPT', 'OPTION', 'NOSCRIPT', 'OBJECT', 'EMBED', 'APPLET', 'LINK', 'HEAD',
-                             'SVG', 'SELECT', 'FORM']
+    ALLOWED_ATTRIBUTES = {'class', 'href', 'src'}
+    TA_IGNORABLE_ELEMENTS = {'STYLE', 'SCRIPT', 'OPTION', 'NOSCRIPT', 'OBJECT', 'EMBED', 'APPLET', 'LINK', 'HEAD',
+                             'SVG', 'SELECT', 'FORM'}
     
     def __init__(self, remove_elements=None, allowed_attributes=None) -> None:
-        self.TA_IGNORABLE_ELEMENTS = remove_elements or self.TA_IGNORABLE_ELEMENTS
-        self.ALLOWED_ATTRIBUTES = allowed_attributes or self.ALLOWED_ATTRIBUTES
+        self.TA_IGNORABLE_ELEMENTS = set(remove_elements) if remove_elements else self.TA_IGNORABLE_ELEMENTS
+        self.ALLOWED_ATTRIBUTES = set(allowed_attributes) if allowed_attributes else self.ALLOWED_ATTRIBUTES
     
     def process(self, doc: TextDocument, is_: str) -> str:
         implementation = Implementation(self)
@@ -70,7 +70,7 @@ class Implementation(AnotherBoilerPipeHTMLParser):
             self.in_ignorable_element += 1
         
         if self.in_ignorable_element == 0:
-            self.html += '<' + q_name
+            self.html += f'<{q_name}'
             
             if self.character_element_idx + 1 in self.content_bit_set:
                 self.html += ' x-boilerpipe-marker'
@@ -78,14 +78,14 @@ class Implementation(AnotherBoilerPipeHTMLParser):
             for attr_name, attr_value in atts.items():
                 if attr_name not in self.hl.ALLOWED_ATTRIBUTES:
                     continue
-                self.html += ' {0}=\"{1}\"'.format(attr_name, self._xml_encode(attr_value or ""))
+                self.html += f' {attr_name}=\"{self._xml_encode(attr_value or "")}\"'
             
             self.html += '>'
     
     def end_element(self, q_name: str) -> None:
         try:
             if self.in_ignorable_element == 0:
-                self.html += "</%s>" % q_name
+                self.html += f'</{q_name}>'
         finally:
             if q_name.upper() in self.hl.TA_IGNORABLE_ELEMENTS:
                 self.in_ignorable_element -= 1
