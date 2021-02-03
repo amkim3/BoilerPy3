@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4 (February 3 2021)
+
+- Added 'raise_on_failure' parameter (default `True`) to extractors to raise exceptions when HTML extraction errors are encountered (they will be handled otherwise).
+- Updated unit tests
+- Fixed some camel-cased variable names
+- Made some minor optimizations
+
 
 ## 1.0.3 (November 21 2020)
 

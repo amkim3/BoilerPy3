@@ -393,7 +393,7 @@ class BoilerpipeBaseParser:
     PAT_VALID_WORD_CHARACTER = re.compile(r"[^\W_]", re.UNICODE)
     PAT_WORD = re.compile(r"\ue00a?[\w\"'.,!@\-:;$?()/]+", re.UNICODE)
     
-    def __init__(self, tag_actions: Dict[str, TagAction] = None) -> None:
+    def __init__(self, tag_actions: Dict[str, TagAction] = None, raise_on_failure: bool = True) -> None:
         """
         Constructs a BoilerpipeHTMLContentHandler using the given TagActionMap.
         
@@ -426,6 +426,8 @@ class BoilerpipeBaseParser:
         self.font_size_stack = []
         self.text_buffer = ''
         self.token_buffer = ''
+        
+        self.raise_on_failure = raise_on_failure
     
     def recycle(self) -> None:
         """
@@ -489,7 +491,11 @@ class BoilerpipeBaseParser:
             self.flush_block()
         self.last_event = self.EVENT_END_TAG
         self.last_end_tag = name
-        self.label_stacks.pop()
+        try:
+            self.label_stacks.pop()
+        except IndexError:
+            if self.raise_on_failure:
+                raise
     
     def characters(self, content: str) -> None:
         self.text_element_idx += 1
@@ -642,9 +648,9 @@ class BoilerpipeBaseParser:
 
 
 class BoilerpipeHTMLParser(HTMLParser, BoilerpipeBaseParser):
-    def __init__(self) -> None:
+    def __init__(self, raise_on_failure: bool = True) -> None:
         HTMLParser.__init__(self)
-        BoilerpipeBaseParser.__init__(self)
+        BoilerpipeBaseParser.__init__(self, raise_on_failure=raise_on_failure)
     
     def feed(self, data: str) -> None:
         self.start_document()
@@ -662,6 +668,6 @@ class BoilerpipeHTMLParser(HTMLParser, BoilerpipeBaseParser):
 
 
 class BoilerpipeSAXContentHandler(ContentHandler, BoilerpipeBaseParser):
-    def __init__(self) -> None:
+    def __init__(self, raise_on_failure: bool = True) -> None:
         ContentHandler.__init__(self)
-        BoilerpipeBaseParser.__init__(self)
+        BoilerpipeBaseParser.__init__(self, raise_on_failure=raise_on_failure)

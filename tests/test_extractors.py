@@ -1,6 +1,9 @@
 import os
 
+import pytest
+
 from boilerpy3.document import DefaultLabels, TextBlock
+from boilerpy3.exceptions import HTMLExtractionError
 from boilerpy3.extractors import ArticleExtractor, Extractor
 
 TESTS_DIR = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
@@ -15,18 +18,18 @@ default_words = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec 
                 "vel. Nulla facilisi. ".split(' ')
 
 
-def content_item(s):
+def _content_item(s):
     if isinstance(s, int):
         return ' '.join(default_words[:s])
     else:
         return s
 
 
-def make_content(str_arr):
-    return [content_item(s) for s in str_arr]
+def _make_content(str_arr):
+    return [_content_item(s) for s in str_arr]
 
 
-def make_doc_2(template, content_arr):
+def _make_doc_2(template, content_arr):
     template_arr = template.split('*')
     s = ""
     for i, j in zip(template_arr[:-1], content_arr):
@@ -38,8 +41,8 @@ def make_doc_2(template, content_arr):
 
 def test_blocks():
     template = "<html><body><p>*</p><div>*<p>*</p>*</div></body></html>"
-    content = make_content([4, 5, 6, 7])
-    doc = make_doc_2(template, content)
+    content = _make_content([4, 5, 6, 7])
+    doc = _make_doc_2(template, content)
     
     blocks = doc.text_blocks
     text_arr = [block.text for block in blocks]
@@ -50,8 +53,8 @@ def test_blocks():
 
 def test_anchor():
     template = "<html><body><p>*</p><div>*<a href='half.html'>*</a></div><a href='full.html'><p>*</p></a></body></html>"
-    content = make_content([6, "end with space ", 3, 6])
-    doc = make_doc_2(template, content)
+    content = _make_content([6, "end with space ", 3, 6])
+    doc = _make_doc_2(template, content)
     
     blocks = doc.text_blocks
     text_arr = [block.text for block in blocks]
@@ -80,7 +83,7 @@ def test_body():
 def test_inline():
     template = "<html><body><div><h1>*</h1><h4>*</h4></div><div><span>*</span><b>*</b></div></body></html>"
     content = ['AA', 'BB', 'CC', 'DD']
-    doc = make_doc_2(template, content)
+    doc = _make_doc_2(template, content)
     
     blocks = doc.text_blocks
     text_arr = [block.text for block in blocks]
@@ -89,8 +92,8 @@ def test_inline():
 
 def test_ignorable():
     template = "<html><body><p>*</p><option><p>*</p></option></body></html>"
-    content = make_content([10, 12])
-    doc = make_doc_2(template, content)
+    content = _make_content([10, 12])
+    doc = _make_doc_2(template, content)
     
     blocks = doc.text_blocks
     text_arr = [block.text for block in blocks]
@@ -103,8 +106,8 @@ def assert_range(val, minval, maxval):
 
 def test_textDensity():
     template = "<html><body><p>*</p><p>*</p></body></html>"
-    content = make_content([80, "one, !!! two"])
-    doc = make_doc_2(template, content)
+    content = _make_content([80, "one, !!! two"])
+    doc = _make_doc_2(template, content)
     
     blocks = doc.text_blocks
     num_arr = [[block.num_words, block.num_words_in_wrapped_lines, block.num_wrapped_lines, block.text_density] for
@@ -121,8 +124,8 @@ def test_textDensity():
 
 def test_block_idxs():
     template = "<html><body><p>*  </p>  <p> * </p><p>*  </p><p>*  </p></body></html>"
-    content = make_content([11, 12, 13, 14])
-    doc = make_doc_2(template, content)
+    content = _make_content([11, 12, 13, 14])
+    doc = _make_doc_2(template, content)
     
     blocks = doc.text_blocks
     idx_arr = [[block.offset_blocks_start, block.offset_blocks_end] for block in blocks]
@@ -131,8 +134,8 @@ def test_block_idxs():
 
 def test_tag_level():
     template = "<html><body><div><p><span><a href='x.html'>*</a></span></p>*</div></body></html>"
-    content = make_content([5, 6])
-    doc = make_doc_2(template, content)
+    content = _make_content([5, 6])
+    doc = _make_doc_2(template, content)
     
     blocks = doc.text_blocks
     level_arr = [block.tag_level for block in blocks]
@@ -179,6 +182,14 @@ Watch Video
     
     with open(os.path.join(TESTS_DIR, 'test.html')) as html_file:
         html = html_file.read()
-    extractor = ArticleExtractor()
-    extracted_text = extractor.get_content(html)
+    article_extractor = ArticleExtractor()
+    extracted_text = article_extractor.get_content(html)
     assert expected.strip() == extracted_text.strip()
+    
+    with open(os.path.join(TESTS_DIR, 'test_bad.html')) as html_file:
+        html = html_file.read()
+    with pytest.raises(HTMLExtractionError):
+        article_extractor.get_content(html)
+    
+    article_extractor.raise_on_failure = False
+    assert article_extractor.get_content(html)

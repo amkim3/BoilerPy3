@@ -11,8 +11,8 @@ from boilerpy3.parser import BoilerpipeHTMLParser
 
 
 class AnotherBoilerPipeHTMLParser(BoilerpipeHTMLParser):
-    def __init__(self) -> None:
-        super(AnotherBoilerPipeHTMLParser, self).__init__()
+    def __init__(self, raise_on_failure: bool = True) -> None:
+        super(AnotherBoilerPipeHTMLParser, self).__init__(raise_on_failure=raise_on_failure)
     
     def error(self, message):
         pass
@@ -26,12 +26,13 @@ class HTMLBoilerpipeMarker:
     TA_IGNORABLE_ELEMENTS = {'STYLE', 'SCRIPT', 'OPTION', 'NOSCRIPT', 'OBJECT', 'EMBED', 'APPLET', 'LINK', 'HEAD',
                              'SVG', 'SELECT', 'FORM'}
     
-    def __init__(self, remove_elements=None, allowed_attributes=None) -> None:
+    def __init__(self, remove_elements=None, allowed_attributes=None, raise_on_failure: bool = True) -> None:
         self.TA_IGNORABLE_ELEMENTS = set(remove_elements) if remove_elements else self.TA_IGNORABLE_ELEMENTS
         self.ALLOWED_ATTRIBUTES = set(allowed_attributes) if allowed_attributes else self.ALLOWED_ATTRIBUTES
+        self.raise_on_failure = raise_on_failure
     
     def process(self, doc: TextDocument, is_: str) -> str:
-        implementation = Implementation(self)
+        implementation = Implementation(self, raise_on_failure=self.raise_on_failure)
         implementation.process(doc, is_)
         return implementation.html
 
@@ -42,10 +43,9 @@ class Implementation(AnotherBoilerPipeHTMLParser):
     character_element_idx = 0
     content_bit_set = set()
     
-    def __init__(self, hl: HTMLBoilerpipeMarker) -> None:
-        
+    def __init__(self, hl: HTMLBoilerpipeMarker, raise_on_failure: bool = True) -> None:
         self.hl = hl
-        super(Implementation, self).__init__()
+        super(Implementation, self).__init__(raise_on_failure=raise_on_failure)
     
     def _xml_encode(self, s: str) -> str:
         return escape(s)

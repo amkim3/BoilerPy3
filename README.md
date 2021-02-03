@@ -61,6 +61,7 @@ title = doc.title
 
 ## Extractors
 
+All extractors have a `raise_on_failure` parameter (defaults to `True`). When set to `False`, the `Extractor` will handle exceptions raised during text extraction and return any text that was successfully extracted. Leaving this at the default setting may be useful if you want to fall back to another algorithm in the event of an error.
 
 ### DefaultExtractor
 

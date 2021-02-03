@@ -12,6 +12,7 @@ from typing import Union
 
 from boilerpy3 import filters, parser
 from boilerpy3.document import TextDocument
+from boilerpy3.exceptions import HTMLExtractionError
 from boilerpy3.filters import BoilerpipeFilter
 from boilerpy3.marker import HTMLBoilerpipeMarker
 
@@ -26,8 +27,16 @@ class Extractor:
     
     SCRIPT_REGEX = re.compile(r'<(?:script|SCRIPT)[^>]*>.*?</(?:script|SCRIPT)>', re.DOTALL)
     
-    def __init__(self, filtr: BoilerpipeFilter) -> None:
+    def __init__(self, filtr: BoilerpipeFilter, raise_on_failure: bool = True) -> None:
+        """
+        Initialize extractor
+        
+        :param filtr: filter
+        :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        """
+        
         self.filter = filtr
+        self.raise_on_failure = raise_on_failure
     
     def get_content(self, text: str) -> str:
         return self.get_doc(text).content
@@ -51,7 +60,7 @@ class Extractor:
     
     def get_marked_html(self, text) -> str:
         doc = self.get_doc(text)
-        m = HTMLBoilerpipeMarker()
+        m = HTMLBoilerpipeMarker(raise_on_failure=self.raise_on_failure)
         return m.process(doc, text)
     
     def read_from_file(self, filename: str) -> str:
@@ -76,18 +85,21 @@ class Extractor:
             return 'utf8'
     
     def parse_doc(self, input_str: str) -> Union[TextDocument, None]:
-        bp_parser = parser.BoilerpipeHTMLParser()
+        bp_parser = parser.BoilerpipeHTMLParser(raise_on_failure=self.raise_on_failure)
         try:
             bp_parser.feed(input_str)
         except:
             # in case of error, try again, first removing script tag content
-            bp_parser = parser.BoilerpipeHTMLParser()
+            bp_parser = parser.BoilerpipeHTMLParser(raise_on_failure=self.raise_on_failure)
             input_str = self.SCRIPT_REGEX.sub('<script></script>', input_str)
             try:
                 bp_parser.feed(input_str)
-            except Exception:
+            except Exception as ex:
                 logger.exception('Error parsing HTML')
-                return None
+                if self.raise_on_failure:
+                    raise HTMLExtractionError from ex
+                else:
+                    return TextDocument([])
         doc = bp_parser.to_text_document()
         return doc
 
@@ -103,8 +115,14 @@ class DefaultExtractor(Extractor):
         filters.DensityRulesClassifier()
     ])
     
-    def __init__(self):
-        super().__init__(self._filter_chain)
+    def __init__(self, raise_on_failure: bool = True) -> None:
+        """
+        Initialize extractor
+        
+        :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        """
+        
+        super().__init__(self._filter_chain, raise_on_failure)
 
 
 class ArticleExtractor(Extractor):
@@ -125,8 +143,14 @@ class ArticleExtractor(Extractor):
         filters.ExpandTitleToContentFilter()
     ])
     
-    def __init__(self):
-        super().__init__(self._filter_chain)
+    def __init__(self, raise_on_failure: bool = True) -> None:
+        """
+        Initialize extractor
+        
+        :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        """
+        
+        super().__init__(self._filter_chain, raise_on_failure)
 
 
 class LargestContentExtractor(Extractor):
@@ -142,8 +166,14 @@ class LargestContentExtractor(Extractor):
         filters.KeepLargestBlockFilter()
     ])
     
-    def __init__(self):
-        super().__init__(self._filter_chain)
+    def __init__(self, raise_on_failure: bool = True) -> None:
+        """
+        Initialize extractor
+        
+        :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        """
+        
+        super().__init__(self._filter_chain, raise_on_failure)
 
 
 class CanolaExtractor(Extractor):
@@ -153,8 +183,14 @@ class CanolaExtractor(Extractor):
     
     _filter = filters.CanolaFilter()
     
-    def __init__(self):
-        super().__init__(self._filter)
+    def __init__(self, raise_on_failure: bool = True) -> None:
+        """
+        Initialize extractor
+        
+        :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        """
+        
+        super().__init__(self._filter, raise_on_failure)
 
 
 class KeepEverythingExtractor(Extractor):
@@ -165,8 +201,14 @@ class KeepEverythingExtractor(Extractor):
     
     _filter = filters.MarkEverythingContentFilter()
     
-    def __init__(self):
-        super().__init__(self._filter)
+    def __init__(self, raise_on_failure: bool = True) -> None:
+        """
+        Initialize extractor
+        
+        :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        """
+        
+        super().__init__(self._filter, raise_on_failure)
 
 
 class NumWordsRulesExtractor(Extractor):
@@ -177,8 +219,14 @@ class NumWordsRulesExtractor(Extractor):
     
     _filter = filters.NumWordsRulesClassifier()
     
-    def __init__(self):
-        super().__init__(self._filter)
+    def __init__(self, raise_on_failure: bool = True) -> None:
+        """
+        Initialize extractor
+        
+        :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        """
+        
+        super().__init__(self._filter, raise_on_failure)
 
 
 class ArticleSentencesExtractor(Extractor):
@@ -192,8 +240,14 @@ class ArticleSentencesExtractor(Extractor):
         filters.MinClauseWordsFilter()
     ])
     
-    def __init__(self):
-        super().__init__(self._filter_chain)
+    def __init__(self, raise_on_failure: bool = True) -> None:
+        """
+        Initialize extractor
+        
+        :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        """
+        
+        super().__init__(self._filter_chain, raise_on_failure)
 
 
 class KeepEverythingWithMinKWordsFilter(filters.FilterChain):

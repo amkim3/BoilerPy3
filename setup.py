@@ -5,7 +5,7 @@ with open('README.md') as readme_file:
 
 setup(
         name='boilerpy3',
-        version='1.0.3',
+        version='1.0.4',
         python_requires='>=3.6.*',
         author='John Riebold',
         author_email='jmriebold@gmail.com',
