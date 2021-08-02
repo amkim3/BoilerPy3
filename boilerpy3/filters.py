@@ -113,7 +113,7 @@ class MarkEverythingContentFilter(BoilerpipeFilter):
         changes = False
         for tb in doc.text_blocks:
             if not tb.is_content:
-                tb.is_content = True
+                tb.set_is_content(True)
                 changes = True
         return changes
 
@@ -128,7 +128,7 @@ class InvertedFilter(BoilerpipeFilter):
         if len(tbs) == 0:
             return False
         for tb in tbs:
-            tb.is_content = not tb.is_content
+            tb.set_is_content(not tb.is_content)
         return True
 
 
@@ -161,7 +161,7 @@ class MinWordsFilter(BoilerpipeFilter):
             if not tb.is_content:
                 continue
             if tb.num_words < self.min_words:
-                tb.is_content = False
+                tb.set_is_content(False)
                 changes = True
         return changes
 
@@ -200,7 +200,7 @@ class MinClauseWordsFilter(BoilerpipeFilter):
             if self.accept_clauses_without_delimiter:
                 has_clause |= self.is_clause_accepted(possible_clause_arr[-1])
             if not has_clause:
-                tb.is_content = False
+                tb.set_is_content(False)
                 changes = True
         return changes
     
@@ -239,7 +239,7 @@ class SplitParagraphBlocksFilter(BoilerpipeFilter):
             labels = tb.labels
             for p in paragraphs:
                 tb_p = TextBlock(p)
-                tb_p.is_content = is_content
+                tb_p.set_is_content(is_content)
                 tb_p.add_labels(labels)
                 blocks_new.append(tb_p)
                 changes = True
@@ -272,7 +272,7 @@ class SurroundingToContentFilter(BoilerpipeFilter):
             cur_block = tbs[i]
             next_block = tbs[i + 1]
             if not cur_block.is_content and prev_block.is_content and next_block.is_content and self.cond(cur_block):
-                cur_block.is_content = True
+                cur_block.set_is_content(True)
                 has_changes = True
                 i += 2
             else:
@@ -298,7 +298,7 @@ class LabelToBoilerplateFilter(BoilerpipeFilter):
         changes = False
         for tb in doc.text_blocks:
             if tb.is_content and any(tb.has_label(label) for label in self.labels):
-                tb.is_content = False
+                tb.set_is_content(False)
                 changes = True
         return changes
 
@@ -316,7 +316,7 @@ class LabelToContentFilter(BoilerpipeFilter):
         changes = False
         for tb in doc.text_blocks:
             if not tb.is_content and any(tb.has_label(label) for label in self.labels):
-                tb.is_content = True
+                tb.set_is_content(True)
                 changes = True
         return changes
 
@@ -530,9 +530,9 @@ class KeepLargestBlockFilter(BoilerpipeFilter):
         
         for tb in text_blocks:
             if tb == largest_block:
-                tb.is_content = True
+                tb.set_is_content(True)
             else:
-                tb.is_content = False
+                tb.set_is_content(False)
                 tb.add_label(DefaultLabels.MIGHT_BE_CONTENT)
         
         if self.expand_to_same_level_text and largest_block is not None:
@@ -544,14 +544,14 @@ class KeepLargestBlockFilter(BoilerpipeFilter):
                 if tl < level:
                     break
                 elif tl == level:
-                    tb.is_content = True
+                    tb.set_is_content(True)
             
             for tb in text_blocks[largest_block_idx:]:
                 tl = tb.tag_level
                 if tl < level:
                     break
                 elif tl == level:
-                    tb.is_content = True
+                    tb.set_is_content(True)
         
         return True
 
@@ -581,10 +581,7 @@ class ExpandTitleToContentFilter(BoilerpipeFilter):
         changes = False
         for tb in doc.text_blocks[title_idx:content_start]:
             if tb.has_label(DefaultLabels.MIGHT_BE_CONTENT):
-                if tb.is_content is not True:
-                    tb.is_content = True
-                    changes = True
-        
+                changes |= tb.set_is_content(True)
         return changes
 
 
@@ -605,7 +602,7 @@ class ArticleMetadataFilter(BoilerpipeFilter):
                 text = tb.text
                 if p.search(text):
                     changed = True
-                    tb.is_content = True
+                    tb.set_is_content(True)
                     tb.add_label(DefaultLabels.ARTICLE_METADATA)
                     break
         return changed
@@ -750,7 +747,7 @@ class MinFulltextWordsFilter(HeuristicFilterBase):
         changes = False
         for tb in doc.text_blocks:
             if tb.is_content and self.get_num_full_text_words(tb) < self.min_words:
-                tb.is_content = False
+                tb.set_is_content(False)
                 changes = True
         return changes
 
@@ -779,9 +776,9 @@ class KeepLargestFulltextBlockFilter(HeuristicFilterBase):
         
         for tb in text_blocks:
             if tb == largest_block:
-                tb.is_content = True
+                tb.set_is_content(True)
             else:
-                tb.is_content = False
+                tb.set_is_content(False)
                 tb.add_label(DefaultLabels.MIGHT_BE_CONTENT)
         return True
 
@@ -812,7 +809,7 @@ class IgnoreBlocksAfterContentFilter(HeuristicFilterBase):
                 found_end_of_text = True
             if found_end_of_text:
                 changes = True
-                block.is_content = False
+                block.set_is_content(False)
         
         return changes
 
@@ -835,7 +832,7 @@ class IgnoreBlocksAfterContentFromEndFilter(HeuristicFilterBase):
             if tb.has_label(DefaultLabels.INDICATES_END_OF_TEXT):
                 tb.add_label(DefaultLabels.STRICTLY_NOT_CONTENT)
                 tb.remove_label(DefaultLabels.MIGHT_BE_CONTENT)
-                tb.is_content = False
+                tb.set_is_content(False)
                 changes = True
             elif tb.is_content:
                 words += tb.num_words
@@ -945,10 +942,7 @@ class NumWordsRulesClassifier(BoilerpipeFilter):
         else:
             is_content = False
         
-        changes = curr_block.is_content is is_content
-        curr_block.is_content = is_content
-        
-        return changes
+        return curr_block.set_is_content(is_content)
 
 
 class DensityRulesClassifier(BoilerpipeFilter):
@@ -999,10 +993,7 @@ class DensityRulesClassifier(BoilerpipeFilter):
         else:
             is_content = False
         
-        changes = curr_block.is_content is is_content
-        curr_block.is_content = is_content
-        
-        return changes
+        return curr_block.set_is_content(is_content)
 
 
 class CanolaFilter(BoilerpipeFilter):
@@ -1035,7 +1026,4 @@ class CanolaFilter(BoilerpipeFilter):
                 (curr_block.num_words > 6 or prev_block.num_words > 7 or next_block.num_words > 19)
         is_content = cond1 or cond2 or cond3
         
-        changes = curr_block.is_content is is_content
-        curr_block.is_content = is_content
-        
-        return changes
+        return curr_block.set_is_content(is_content)
