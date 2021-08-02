@@ -26,6 +26,8 @@ class HTMLBoilerpipeMarker:
     ALLOWED_ATTRIBUTES = {'class', 'href', 'src'}
     TA_IGNORABLE_ELEMENTS = {'STYLE', 'SCRIPT', 'OPTION', 'NOSCRIPT', 'OBJECT', 'EMBED', 'APPLET', 'LINK', 'HEAD',
                              'SVG', 'SELECT', 'FORM'}
+    VOID_ELEMENTS = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'meta', 'param',
+                     'source', 'track', 'wbr'}
     
     def __init__(self, remove_elements: Iterable = None, allowed_attributes: Iterable = None,
                  raise_on_failure: bool = True) -> None:
@@ -69,7 +71,8 @@ class Implementation(AnotherBoilerPipeHTMLParser):
     
     def start_element(self, q_name: str, atts: dict) -> None:
         if q_name.upper() in self.hl.TA_IGNORABLE_ELEMENTS:
-            self.in_ignorable_element += 1
+            if q_name.lower() not in self.hl.VOID_ELEMENTS:
+                self.in_ignorable_element += 1
         
         if self.in_ignorable_element == 0:
             self.html += f'<{q_name}'
