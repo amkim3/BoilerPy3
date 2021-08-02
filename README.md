@@ -29,6 +29,8 @@ pip install git+https://github.com/jmriebold/BoilerPy3
 
 ## Usage
 
+### Text Extraction
+
 The top-level interfaces are the Extractors. Use the `get_content()` methods to extract the filtered text.
 
 ```python
@@ -45,6 +47,27 @@ content = extractor.get_content_from_file('tests/test.html')
 # From raw HTML
 content = extractor.get_content('<html><body><h1>Example</h1></body></html>')
 ```
+
+### Marked HTML Extraction
+
+To extract the HTML chunks containing filtered text, use the `get_marked_html()` methods.
+
+```python
+from boilerpy3 import extractors
+
+extractor = extractors.ArticleExtractor()
+
+# From a URL
+content = extractor.get_marked_html_from_url('http://www.example.com/')
+
+# From a file
+content = extractor.get_marked_html_from_file('tests/test.html')
+
+# From raw HTML
+content = extractor.get_marked_html('<html><body><h1>Example</h1></body></html>')
+```
+
+### Other
 
 Alternatively, use `get_doc()` to return a Boilerpipe document from which you can get more detailed information.
 

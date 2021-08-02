@@ -31,7 +31,7 @@ class Extractor:
     def __init__(self, filtr: BoilerpipeFilter, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param filtr: filter
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
@@ -61,9 +61,17 @@ class Extractor:
     
     def get_marked_html(self, text: str) -> str:
         doc = self.get_doc(text)
-        m = HTMLBoilerpipeMarker(raise_on_failure=self.raise_on_failure)
-        return m.process(doc, text)
-    
+        marker = HTMLBoilerpipeMarker(raise_on_failure=self.raise_on_failure)
+        return marker.process(doc, text)
+
+    def get_marked_html_from_url(self, url: str) -> str:
+        text = self.read_from_url(url)
+        return self.get_marked_html(text)
+
+    def get_marked_html_from_file(self, filename: str) -> str:
+        text = self.read_from_file(filename)
+        return self.get_marked_html(text)
+
     def read_from_file(self, filename: str) -> str:
         with open(filename) as text_file:
             return text_file.read()
@@ -119,7 +127,7 @@ class DefaultExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -147,7 +155,7 @@ class ArticleExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -170,7 +178,7 @@ class LargestContentExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -187,7 +195,7 @@ class CanolaExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -205,7 +213,7 @@ class KeepEverythingExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -223,7 +231,7 @@ class NumWordsRulesExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -244,7 +252,7 @@ class ArticleSentencesExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
