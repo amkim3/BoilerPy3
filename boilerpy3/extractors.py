@@ -3,6 +3,7 @@ This file is licensed under the terms of the Apache License, Version 2.0. See th
 repository for complete details.
 """
 
+import http.client
 import re
 import urllib.error
 import urllib.parse
@@ -30,7 +31,7 @@ class Extractor:
     def __init__(self, filtr: BoilerpipeFilter, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param filtr: filter
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
@@ -44,25 +45,33 @@ class Extractor:
     def get_content_from_url(self, url: str) -> str:
         return self.get_doc_from_url(url).content
     
-    def get_content_from_file(self, filename) -> str:
+    def get_content_from_file(self, filename: str) -> str:
         return self.get_doc_from_file(filename).content
     
-    def get_doc_from_file(self, filename) -> TextDocument:
+    def get_doc_from_file(self, filename: str) -> TextDocument:
         return self.get_doc(self.read_from_file(filename))
     
-    def get_doc_from_url(self, url) -> TextDocument:
+    def get_doc_from_url(self, url: str) -> TextDocument:
         return self.get_doc(self.read_from_url(url))
     
-    def get_doc(self, text) -> TextDocument:
+    def get_doc(self, text: str) -> TextDocument:
         doc = self.parse_doc(text)
         self.filter.process(doc)
         return doc
     
-    def get_marked_html(self, text) -> str:
+    def get_marked_html(self, text: str) -> str:
         doc = self.get_doc(text)
-        m = HTMLBoilerpipeMarker(raise_on_failure=self.raise_on_failure)
-        return m.process(doc, text)
-    
+        marker = HTMLBoilerpipeMarker(raise_on_failure=self.raise_on_failure)
+        return marker.process(doc, text)
+
+    def get_marked_html_from_url(self, url: str) -> str:
+        text = self.read_from_url(url)
+        return self.get_marked_html(text)
+
+    def get_marked_html_from_file(self, filename: str) -> str:
+        text = self.read_from_file(filename)
+        return self.get_marked_html(text)
+
     def read_from_file(self, filename: str) -> str:
         with open(filename) as text_file:
             return text_file.read()
@@ -78,7 +87,7 @@ class Extractor:
             pass
         return text
     
-    def get_url_encoding(self, f) -> str:
+    def get_url_encoding(self, f: http.client.HTTPResponse) -> str:
         try:
             return f.headers['content-type'].split('charset=')[1].split(';')[0]
         except:
@@ -118,7 +127,7 @@ class DefaultExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -146,7 +155,7 @@ class ArticleExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -169,7 +178,7 @@ class LargestContentExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -186,7 +195,7 @@ class CanolaExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -204,7 +213,7 @@ class KeepEverythingExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -222,7 +231,7 @@ class NumWordsRulesExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         
@@ -243,7 +252,7 @@ class ArticleSentencesExtractor(Extractor):
     def __init__(self, raise_on_failure: bool = True) -> None:
         """
         Initialize extractor
-        
+
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
         """
         

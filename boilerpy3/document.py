@@ -59,6 +59,13 @@ class TextBlock:
         self.text_density = self.num_words_in_wrapped_lines / float(self.num_wrapped_lines)
         self.link_density = 0 if self.num_words == 0 else self.num_words_in_anchor_text / float(self.num_words)
     
+    def set_is_content(self, is_content: bool) -> bool:
+        if is_content != self.is_content:
+            self.is_content = is_content
+            return True
+        else:
+            return False
+    
     def merge_next(self, next_text_block: 'TextBlock') -> None:
         if self.text is None:
             self.text = ""
