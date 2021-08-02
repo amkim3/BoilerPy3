@@ -303,7 +303,7 @@ class CommonTagActions:
     TA_FONT = FontTagAction()
 
 
-defaultTagActionMap = {
+default_tag_action_map = {
     "STYLE": CommonTagActions.TA_IGNORABLE_ELEMENT,
     "SCRIPT": CommonTagActions.TA_IGNORABLE_ELEMENT,
     "OPTION": CommonTagActions.TA_IGNORABLE_ELEMENT,
@@ -401,9 +401,9 @@ class BoilerpipeBaseParser:
         """
         
         if tag_actions is None:
-            self.tagActions = defaultTagActionMap
+            self.tag_actions = default_tag_action_map
         else:
-            self.tagActions = tag_actions
+            self.tag_actions = tag_actions
         
         self.clear_text_buffer()
         self.in_body = 0
@@ -466,7 +466,7 @@ class BoilerpipeBaseParser:
     def start_element(self, name: str, attrs: AttributesImpl) -> None:
         self.label_stacks.append([])
         
-        tag_action = self.tagActions.get(name.strip().upper())
+        tag_action = self.tag_actions.get(name.strip().upper())
         if tag_action is not None:
             self.flush |= tag_action.start(self, name, attrs)
             if tag_action.changes_tag_level():
@@ -478,7 +478,7 @@ class BoilerpipeBaseParser:
         self.last_start_tag = name
     
     def end_element(self, name: str) -> None:
-        tag_action = self.tagActions.get(name.strip().upper())
+        tag_action = self.tag_actions.get(name.strip().upper())
         if tag_action is not None:
             self.flush |= tag_action.end(self, name)
             if tag_action.changes_tag_level():

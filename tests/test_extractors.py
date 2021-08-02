@@ -8,7 +8,7 @@ from boilerpy3.extractors import ArticleExtractor, Extractor
 
 TESTS_DIR = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
-extractor = Extractor(None)
+extractor = Extractor(None)  # noqa
 default_words = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec fermentum tincidunt magna, eu " \
                 "pulvinar mauris dapibus pharetra. In varius, nisl a rutrum porta, sem sem semper lacus, et varius " \
                 "urna tellus vel lorem. Nullam urna eros, luctus eget blandit ac, imperdiet feugiat ipsum. Donec " \
