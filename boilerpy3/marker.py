@@ -4,6 +4,7 @@ repository for complete details.
 """
 
 from html import escape
+from typing import Iterable
 from xml.sax.xmlreader import AttributesImpl
 
 from boilerpy3.document import TextDocument
@@ -14,10 +15,10 @@ class AnotherBoilerPipeHTMLParser(BoilerpipeHTMLParser):
     def __init__(self, raise_on_failure: bool = True) -> None:
         super(AnotherBoilerPipeHTMLParser, self).__init__(raise_on_failure=raise_on_failure)
     
-    def error(self, message):
+    def error(self, message: str):
         pass
     
-    def handle_starttag(self, tag, attributes) -> None:
+    def handle_starttag(self, tag: str, attributes) -> None:
         self.start_element(tag, AttributesImpl(dict(attributes)))
 
 
@@ -26,7 +27,8 @@ class HTMLBoilerpipeMarker:
     TA_IGNORABLE_ELEMENTS = {'STYLE', 'SCRIPT', 'OPTION', 'NOSCRIPT', 'OBJECT', 'EMBED', 'APPLET', 'LINK', 'HEAD',
                              'SVG', 'SELECT', 'FORM'}
     
-    def __init__(self, remove_elements=None, allowed_attributes=None, raise_on_failure: bool = True) -> None:
+    def __init__(self, remove_elements: Iterable = None, allowed_attributes: Iterable = None,
+                 raise_on_failure: bool = True) -> None:
         self.TA_IGNORABLE_ELEMENTS = set(remove_elements) if remove_elements else self.TA_IGNORABLE_ELEMENTS
         self.ALLOWED_ATTRIBUTES = set(allowed_attributes) if allowed_attributes else self.ALLOWED_ATTRIBUTES
         self.raise_on_failure = raise_on_failure

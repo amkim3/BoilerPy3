@@ -3,6 +3,7 @@ This file is licensed under the terms of the Apache License, Version 2.0. See th
 repository for complete details.
 """
 
+import http.client
 import re
 import urllib.error
 import urllib.parse
@@ -44,21 +45,21 @@ class Extractor:
     def get_content_from_url(self, url: str) -> str:
         return self.get_doc_from_url(url).content
     
-    def get_content_from_file(self, filename) -> str:
+    def get_content_from_file(self, filename: str) -> str:
         return self.get_doc_from_file(filename).content
     
-    def get_doc_from_file(self, filename) -> TextDocument:
+    def get_doc_from_file(self, filename: str) -> TextDocument:
         return self.get_doc(self.read_from_file(filename))
     
-    def get_doc_from_url(self, url) -> TextDocument:
+    def get_doc_from_url(self, url: str) -> TextDocument:
         return self.get_doc(self.read_from_url(url))
     
-    def get_doc(self, text) -> TextDocument:
+    def get_doc(self, text: str) -> TextDocument:
         doc = self.parse_doc(text)
         self.filter.process(doc)
         return doc
     
-    def get_marked_html(self, text) -> str:
+    def get_marked_html(self, text: str) -> str:
         doc = self.get_doc(text)
         m = HTMLBoilerpipeMarker(raise_on_failure=self.raise_on_failure)
         return m.process(doc, text)
@@ -78,7 +79,7 @@ class Extractor:
             pass
         return text
     
-    def get_url_encoding(self, f) -> str:
+    def get_url_encoding(self, f: http.client.HTTPResponse) -> str:
         try:
             return f.headers['content-type'].split('charset=')[1].split(';')[0]
         except:
