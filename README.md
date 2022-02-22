@@ -39,7 +39,7 @@ from boilerpy3 import extractors
 extractor = extractors.ArticleExtractor()
 
 # From a URL
-content = extractor.get_content_from_url('http://www.example.com/')
+content = extractor.get_content_from_url('http://example.com/')
 
 # From a file
 content = extractor.get_content_from_file('tests/test.html')
@@ -47,6 +47,7 @@ content = extractor.get_content_from_file('tests/test.html')
 # From raw HTML
 content = extractor.get_content('<html><body><h1>Example</h1></body></html>')
 ```
+
 
 ### Marked HTML Extraction
 
@@ -58,7 +59,7 @@ from boilerpy3 import extractors
 extractor = extractors.ArticleExtractor()
 
 # From a URL
-content = extractor.get_marked_html_from_url('http://www.example.com/')
+content = extractor.get_marked_html_from_url('http://example.com/')
 
 # From a file
 content = extractor.get_marked_html_from_file('tests/test.html')
@@ -66,6 +67,7 @@ content = extractor.get_marked_html_from_file('tests/test.html')
 # From raw HTML
 content = extractor.get_marked_html('<html><body><h1>Example</h1></body></html>')
 ```
+
 
 ### Other
 
@@ -76,7 +78,7 @@ from boilerpy3 import extractors
 
 extractor = extractors.ArticleExtractor()
 
-doc = extractor.get_doc_from_url('http://www.example.com/')
+doc = extractor.get_doc_from_url('http://example.com/')
 content = doc.content
 title = doc.title
 ```
@@ -86,6 +88,7 @@ title = doc.title
 
 All extractors have a `raise_on_failure` parameter (defaults to `True`). When set to `False`, the `Extractor` will handle exceptions raised during text extraction and return any text that was successfully extracted. Leaving this at the default setting may be useful if you want to fall back to another algorithm in the event of an error.
 
+
 ### DefaultExtractor
 
 Usually worse than ArticleExtractor, but simpler/no heuristics. A quite generic full-text extractor.
@@ -94,6 +97,7 @@ Usually worse than ArticleExtractor, but simpler/no heuristics. A quite generic 
 ### ArticleExtractor
 
 A full-text extractor which is tuned towards news articles. In this scenario it achieves higher accuracy than DefaultExtractor. Works very well for most types of Article-like HTML.
+
 
 ### ArticleSentencesExtractor
 
@@ -118,3 +122,24 @@ Dummy extractor which marks everything as content. Should return the input text.
 ### NumWordsRulesExtractor
 
 A quite generic full-text extractor solely based upon the number of words per block (the current, the previous and the next block).
+
+
+## Notes
+
+
+### Getting Content from URLs
+
+While BoilerPy3 provides `extractor.*_from_url()` methods as a convenience, these are intended for testing only. For more robust functionality, in addition to full control over the request itself, it is strongly recommended to use the [Requests package](https://docs.python-requests.org/) instead, calling `extractor.get_content()` with the resulting HTML.
+
+```python
+import requests
+from boilerpy3 import extractors
+
+extractor = extractors.ArticleExtractor()
+
+# Make request to URL
+resp = requests.get('http://example.com/')
+
+# Pass HTML to Extractor
+content = extractor.get_content(resp.text)
+```
