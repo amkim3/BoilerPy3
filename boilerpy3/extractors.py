@@ -8,6 +8,7 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from copy import deepcopy
 from logging import getLogger
 from typing import Union
 
@@ -28,22 +29,26 @@ class Extractor:
     
     SCRIPT_REGEX = re.compile(r'<(?:script|SCRIPT)[^>]*>.*?</(?:script|SCRIPT)>', re.DOTALL)
     
-    def __init__(self, filtr: BoilerpipeFilter, raise_on_failure: bool = True) -> None:
+    def __init__(self, filtr: BoilerpipeFilter, raise_on_failure: bool = True, request_kwargs: dict = None) -> None:
         """
         Initialize extractor
 
         :param filtr: filter
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        :param request_kwargs: kwargs to pass to urllib.request
         """
         
         self.filter = filtr
         self.raise_on_failure = raise_on_failure
+        if request_kwargs is None:
+            request_kwargs = {}
+        self._request_kwargs = request_kwargs
     
     def get_content(self, text: str) -> str:
         return self.get_doc(text).content
     
-    def get_content_from_url(self, url: str) -> str:
-        return self.get_doc_from_url(url).content
+    def get_content_from_url(self, url: str, request_kwargs: dict = None) -> str:
+        return self.get_doc_from_url(url, request_kwargs).content
     
     def get_content_from_file(self, filename: str) -> str:
         return self.get_doc_from_file(filename).content
@@ -51,8 +56,8 @@ class Extractor:
     def get_doc_from_file(self, filename: str) -> TextDocument:
         return self.get_doc(self.read_from_file(filename))
     
-    def get_doc_from_url(self, url: str) -> TextDocument:
-        return self.get_doc(self.read_from_url(url))
+    def get_doc_from_url(self, url: str, request_kwargs: dict = None) -> TextDocument:
+        return self.get_doc(self.read_from_url(url, request_kwargs))
     
     def get_doc(self, text: str) -> TextDocument:
         doc = self.parse_doc(text)
@@ -63,21 +68,25 @@ class Extractor:
         doc = self.get_doc(text)
         marker = HTMLBoilerpipeMarker(raise_on_failure=self.raise_on_failure)
         return marker.process(doc, text)
-
+    
     def get_marked_html_from_url(self, url: str) -> str:
         text = self.read_from_url(url)
         return self.get_marked_html(text)
-
+    
     def get_marked_html_from_file(self, filename: str) -> str:
         text = self.read_from_file(filename)
         return self.get_marked_html(text)
-
+    
     def read_from_file(self, filename: str) -> str:
         with open(filename) as text_file:
             return text_file.read()
     
-    def read_from_url(self, url: str) -> str:
-        with urllib.request.urlopen(url) as url_obj:
+    def read_from_url(self, url: str, request_kwargs: dict = None) -> str:
+        all_request_kwargs = deepcopy(self._request_kwargs)
+        if request_kwargs is not None:
+            all_request_kwargs.update(request_kwargs)
+        
+        with urllib.request.urlopen(url, **all_request_kwargs) as url_obj:
             text = url_obj.read()
             encoding = self.get_url_encoding(url_obj)
         
@@ -124,14 +133,15 @@ class DefaultExtractor(Extractor):
         filters.DensityRulesClassifier()
     ])
     
-    def __init__(self, raise_on_failure: bool = True) -> None:
+    def __init__(self, raise_on_failure: bool = True, request_kwargs: dict = None) -> None:
         """
         Initialize extractor
 
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        :param request_kwargs: kwargs to pass to urllib.request
         """
         
-        super().__init__(self._filter_chain, raise_on_failure)
+        super().__init__(self._filter_chain, raise_on_failure, request_kwargs)
 
 
 class ArticleExtractor(Extractor):
@@ -152,14 +162,15 @@ class ArticleExtractor(Extractor):
         filters.ExpandTitleToContentFilter()
     ])
     
-    def __init__(self, raise_on_failure: bool = True) -> None:
+    def __init__(self, raise_on_failure: bool = True, request_kwargs: dict = None) -> None:
         """
         Initialize extractor
 
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        :param request_kwargs: kwargs to pass to urllib.request
         """
         
-        super().__init__(self._filter_chain, raise_on_failure)
+        super().__init__(self._filter_chain, raise_on_failure, request_kwargs)
 
 
 class LargestContentExtractor(Extractor):
@@ -175,14 +186,15 @@ class LargestContentExtractor(Extractor):
         filters.KeepLargestBlockFilter()
     ])
     
-    def __init__(self, raise_on_failure: bool = True) -> None:
+    def __init__(self, raise_on_failure: bool = True, request_kwargs: dict = None) -> None:
         """
         Initialize extractor
 
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        :param request_kwargs: kwargs to pass to urllib.request
         """
         
-        super().__init__(self._filter_chain, raise_on_failure)
+        super().__init__(self._filter_chain, raise_on_failure, request_kwargs)
 
 
 class CanolaExtractor(Extractor):
@@ -192,14 +204,15 @@ class CanolaExtractor(Extractor):
     
     _filter = filters.CanolaFilter()
     
-    def __init__(self, raise_on_failure: bool = True) -> None:
+    def __init__(self, raise_on_failure: bool = True, request_kwargs: dict = None) -> None:
         """
         Initialize extractor
 
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        :param request_kwargs: kwargs to pass to urllib.request
         """
         
-        super().__init__(self._filter, raise_on_failure)
+        super().__init__(self._filter, raise_on_failure, request_kwargs)
 
 
 class KeepEverythingExtractor(Extractor):
@@ -210,14 +223,15 @@ class KeepEverythingExtractor(Extractor):
     
     _filter = filters.MarkEverythingContentFilter()
     
-    def __init__(self, raise_on_failure: bool = True) -> None:
+    def __init__(self, raise_on_failure: bool = True, request_kwargs: dict = None) -> None:
         """
         Initialize extractor
 
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        :param request_kwargs: kwargs to pass to urllib.request
         """
         
-        super().__init__(self._filter, raise_on_failure)
+        super().__init__(self._filter, raise_on_failure, request_kwargs)
 
 
 class NumWordsRulesExtractor(Extractor):
@@ -228,14 +242,15 @@ class NumWordsRulesExtractor(Extractor):
     
     _filter = filters.NumWordsRulesClassifier()
     
-    def __init__(self, raise_on_failure: bool = True) -> None:
+    def __init__(self, raise_on_failure: bool = True, request_kwargs: dict = None) -> None:
         """
         Initialize extractor
 
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        :param request_kwargs: kwargs to pass to urllib.request
         """
         
-        super().__init__(self._filter, raise_on_failure)
+        super().__init__(self._filter, raise_on_failure, request_kwargs)
 
 
 class ArticleSentencesExtractor(Extractor):
@@ -249,14 +264,15 @@ class ArticleSentencesExtractor(Extractor):
         filters.MinClauseWordsFilter()
     ])
     
-    def __init__(self, raise_on_failure: bool = True) -> None:
+    def __init__(self, raise_on_failure: bool = True, request_kwargs: dict = None) -> None:
         """
         Initialize extractor
 
         :param raise_on_failure: whether or not to raise an exception if a text extraction failure is encountered.
+        :param request_kwargs: kwargs to pass to urllib.request
         """
         
-        super().__init__(self._filter_chain, raise_on_failure)
+        super().__init__(self._filter_chain, raise_on_failure, request_kwargs)
 
 
 class KeepEverythingWithMinKWordsFilter(filters.FilterChain):

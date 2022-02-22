@@ -7,4 +7,4 @@ from boilerpy3 import document, extractors, filters, parser
 
 __all__ = ('document', 'extractors', 'filters', 'parser')
 
-__version__ = '1.0.5'
+__version__ = '1.0.6'

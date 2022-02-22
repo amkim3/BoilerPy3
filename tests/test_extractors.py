@@ -1,4 +1,5 @@
 import os
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -203,3 +204,23 @@ Watch Video
     
     article_extractor.raise_on_failure = False
     assert article_extractor.get_content(html)
+
+
+@patch('urllib.request.urlopen')
+def test_request_kwargs(mock_urlopen):
+    extractor = Extractor(None)  # noqa
+    assert extractor._request_kwargs == {}
+    
+    request_kwargs = {'timeout': 30}
+    extractor = Extractor(None, request_kwargs=request_kwargs)  # noqa
+    assert extractor._request_kwargs == request_kwargs
+    
+    mock_request = MagicMock()
+    mock_request.getcode.return_value = 200
+    mock_request.read.return_value = b'<html><body><h1>Example</h1></body></html>'
+    mock_request.headers = {'content-type': 'charset=utf-8'}
+    mock_request.__enter__.return_value = mock_request
+    mock_urlopen.return_value = mock_request
+    extractor = ArticleExtractor(request_kwargs=request_kwargs)
+    extractor.get_content_from_url('example.com', {'foo': 'bar'})
+    mock_urlopen.assert_called_with('example.com', timeout=30, foo='bar')
