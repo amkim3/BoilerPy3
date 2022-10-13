@@ -3,11 +3,10 @@ from datetime import time
 from boilerpy3 import extractors
 import time
 
-extractor = extractors.ArticleExtractor()
-count = 1
+extractor = extractors.KeepEverythingExtractor()
 # From a URL
-with open("extractedText6.txt", "a") as file:
-    with open("updatedLinks.txt") as urls:
+with open("extractedText8.txt", "a") as file:
+    with open("onelink.txt") as urls:
         for url in urls:
             extracted = None
             file.write(url + '\n')
