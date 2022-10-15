@@ -5,6 +5,6 @@ import time
 
 extractor = extractors.KeepEverythingExtractor()
 # From a URL
-with open("extractedText11.txt", "a") as file:
-    file.write(extractor.get_content_from_file('beautifulsoupoutput.html'))
+with open("htmlextractedtext.txt", "a") as file:
+    file.write(extractor.get_content_from_file('beautifulsoupoutput1.html'))
 file.close()
