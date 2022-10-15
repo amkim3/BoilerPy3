@@ -7,12 +7,11 @@ soup = BeautifulSoup(page.content, 'html.parser')
 for div in soup.find_all("div", {'class':'horizontal-navigation-bar clear with-logo'}):
     div.decompose()
 
-for div in soup.find_all("div", {'id':'sidebar-one' or 'page-footer'}):
-    div.decompose()
-
+soup.find("div", id="sidebar-one").decompose()
+soup.find("div", id="page-footer").decompose()
 
 print(soup.prettify())
 
-# with open("beautifulsoupoutput.html", "w") as file:
-#     file.write(str(soup))
+with open("beautifulsoupoutput1.html", "w") as file:
+    file.write(str(soup))
 
