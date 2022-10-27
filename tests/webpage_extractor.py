@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 
 def webpage_extractor(url):
     grab = requests.get(url)
-    soup = BeautifulSoup(grab.text, 'html.parser'
+    soup = BeautifulSoup(grab.text, 'html.parser')
 
     # opening a file in write mode
     f = open("webpages.txt", "w")
@@ -14,4 +14,4 @@ def webpage_extractor(url):
         f.write(url + data)
         f.write("\n")
 
-    return f
+    return open("webpages.txt", mode = 'r', encoding='utf-8')

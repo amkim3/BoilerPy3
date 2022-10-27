@@ -6,12 +6,30 @@ import sys
 
 
 def main():
-    print(sys.argv[1])
-    urls = open("output.txt", "w")
+    # print(sys.argv[1])
+
+    # open file to output webpage links to
+    # urls = open("output.txt", "w")
+
+    # webpage_extractor returns the links of all the webpages
     urls = webpage_extractor(str(sys.argv[1]))
-    open(urls)
+
+    # for each url, call url_to_html to remove unnecessary classes
+    count = 0
     for url in urls:
-        print(url)
+        # print(url)
+        if count == 0:
+            count += 1
+            continue
+        file = get_html(str(url))
+        # print(file.title)
+        # print(file.contents)
+        # with open("testtt.txt", "w") as f:
+        #     f.write(file.contents.read())
+        #     print(file.contents.read())
+        #     # print("penis")
+        count += 1
+        if count == 3: break
 
 
 if __name__ == '__main__':
