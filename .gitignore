@@ -7,6 +7,7 @@
 *.pyc
 
 # Test
+tests/
 .coverage
 htmlcov/
 .pytest_cache/
