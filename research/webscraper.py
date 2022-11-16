@@ -60,10 +60,10 @@ def main():
     # Loop through
     count = 0
     for url in urls:
-        if count == 1:
+        if count == 1: # For testing
             url = url.replace("\n", "") # Otherwise code will not work
             # call get_html
-            url = "https://www.westalabamaaging.org/alabama-farmers-market-program"
+            # url = "https://www.westalabamaaging.org/alabama-farmers-market-program"
             title = get_html(url)
             # extract text
             extractor = extractors.KeepEverythingExtractor() # Boilerpipe "keep everything" extractor
@@ -71,16 +71,14 @@ def main():
             with open("%s.txt" % title, "w+") as f:
                 text = extractor.get_content_from_file('%s.html' % title)
                 # f.write(extractor.get_content_from_file('%s.html' % title))
+
+                # Get rid of "/xa0" text
                 clean_text = unicodedata.normalize("NFKD", text)
-                # print(clean
                 f.write(clean_text)
-                # filedata = f.read()
-                # filedata = filedata.replace('\xa0', ' ')
-                # f.write(filedata)
             f.close()
 
-            break
-        else:
+            break # Break to just get first file
+        else: # testing
             count += 1
 
 
