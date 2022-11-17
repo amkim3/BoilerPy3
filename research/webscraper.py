@@ -26,6 +26,7 @@ def webpage_extractor(url):
 def get_html(url):
     page = requests.get(str(url))  # request url
     soup = BeautifulSoup(page.content, 'html.parser')  # get html from url using html.parser
+
     # with open("../tests/hehetest.txt", "w") as f:
     #     f.write(soup.prettify())
 
@@ -45,6 +46,12 @@ def get_html(url):
 
     soup.find("nav", id="mobile-navigation").decompose()
 
+    # extractor does not automatically grab links within pages, so this will add the links
+    for link in soup.findAll("a"):
+        if link.get("href").startswith("http"):
+            text = link.get_text()+" "+ link.get("href")
+            link.string = text
+
     title = soup.title.get_text()
     title = ''.join(char if char.isalnum() else '_' for char in title)
     with open('%s.html' % title, "w") as file:
@@ -63,7 +70,7 @@ def main():
         if count == 1: # For testing
             url = url.replace("\n", "") # Otherwise code will not work
             # call get_html
-            # url = "https://www.westalabamaaging.org/alabama-farmers-market-program"
+            url = "https://www.westalabamaaging.org/alabama-farmers-market-program"
             title = get_html(url)
             # extract text
             extractor = extractors.KeepEverythingExtractor() # Boilerpipe "keep everything" extractor
