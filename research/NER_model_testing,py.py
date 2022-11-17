@@ -5,7 +5,7 @@ import spacy
 from spacy import displacy
 
 nlp_output = spacy.load("output/model-best")
-
+output = open("results.txt", "w")
 
 def model_visualization(text):
     # pass our test instance into the trained pipeline
@@ -24,6 +24,8 @@ def model_visualization(text):
 
     # print out the identified entities
     print("\nIDENTIFIED ENTITIES:")
+    [output.write(ent.text + '\n') for ent in doc.ents]
+    output.write('\n')
     [print(ent.text) for ent in doc.ents]
     return
 
