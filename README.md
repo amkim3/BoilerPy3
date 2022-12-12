@@ -1,4 +1,4 @@
-# BoilerPy3
+# Fall 2022 Dementia Chatbot Research
 
 ![build](https://github.com/jmriebold/BoilerPy3/workflows/Tests/badge.svg)
 
